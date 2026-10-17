@@ -1,0 +1,225 @@
+package catalog
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"time"
+
+	"github.com/808-d/honya-api/internal/database/sqlc"
+	"github.com/808-d/honya-api/internal/shared/apperror"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+const (
+	defaultPerPage = 20
+	maxPerPage     = 100
+)
+
+type Service struct {
+	repo *Repository
+}
+
+func NewService(repo *Repository) *Service {
+	return &Service{repo: repo}
+}
+
+// List returns a page of products. It panics with an *apperror.Error on failure.
+func (s *Service) List(ctx context.Context, filter ListFilter) *ListResult {
+	if filter.Page < 1 {
+		filter.Page = 1
+	}
+	if filter.PerPage < 1 || filter.PerPage > maxPerPage {
+		filter.PerPage = defaultPerPage
+	}
+	search := strings.TrimSpace(filter.Search)
+	if filter.MinPrice != nil && filter.MaxPrice != nil && *filter.MinPrice > *filter.MaxPrice {
+		panic(apperror.BadRequest("min_price cannot be greater than max_price"))
+	}
+
+	products, err := s.repo.List(ctx, sqlc.ListProductsParams{
+		FilterStatus: int2FromPtr(filter.Status),
+		FilterType:   int2FromPtr(filter.Type),
+		Search:       textFromString(search),
+		MinPrice:     float8FromPtr(filter.MinPrice),
+		MaxPrice:     float8FromPtr(filter.MaxPrice),
+		PageLimit:    int32(filter.PerPage),
+		PageOffset:   int32((filter.Page - 1) * filter.PerPage),
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	total, err := s.repo.Count(ctx, sqlc.CountProductsParams{
+		FilterStatus: int2FromPtr(filter.Status),
+		FilterType:   int2FromPtr(filter.Type),
+		Search:       textFromString(search),
+		MinPrice:     float8FromPtr(filter.MinPrice),
+		MaxPrice:     float8FromPtr(filter.MaxPrice),
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	items := make([]ProductResponse, 0, len(products))
+	for i := range products {
+		items = append(items, toResponse(&products[i]))
+	}
+
+	return &ListResult{
+		Items:   items,
+		Total:   total,
+		Page:    filter.Page,
+		PerPage: filter.PerPage,
+	}
+}
+
+// Get returns a product by its public id.
+func (s *Service) Get(ctx context.Context, publicID string) ProductResponse {
+	product, err := s.repo.GetByPublicID(ctx, publicID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			panic(apperror.NotFound("product not found"))
+		}
+		panic(err)
+	}
+	return toResponse(product)
+}
+
+// Create validates and inserts a product.
+func (s *Service) Create(ctx context.Context, in ProductInput) ProductResponse {
+	product, err := s.repo.Create(ctx, s.validate(in))
+	if err != nil {
+		panic(err)
+	}
+	return toResponse(product)
+}
+
+// Update validates and replaces a product.
+func (s *Service) Update(ctx context.Context, publicID string, in ProductInput) ProductResponse {
+	product, err := s.repo.Update(ctx, publicID, s.validate(in))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			panic(apperror.NotFound("product not found"))
+		}
+		panic(err)
+	}
+	return toResponse(product)
+}
+
+// Delete soft-deletes a product.
+func (s *Service) Delete(ctx context.Context, publicID string) {
+	affected, err := s.repo.SoftDelete(ctx, publicID)
+	if err != nil {
+		panic(err)
+	}
+	if affected == 0 {
+		panic(apperror.NotFound("product not found"))
+	}
+}
+
+func (s *Service) validate(in ProductInput) ProductWrite {
+	title := strings.TrimSpace(in.Title)
+	if title == "" {
+		panic(apperror.BadRequest("title is required"))
+	}
+	if in.Status < 0 || in.Status > 2 {
+		panic(apperror.BadRequest("status must be between 0 and 2"))
+	}
+	if in.Type < 0 || in.Type > 4 {
+		panic(apperror.BadRequest("type must be between 0 and 4"))
+	}
+	if in.Stock < 0 {
+		panic(apperror.BadRequest("stock cannot be negative"))
+	}
+	if in.Price < 0 {
+		panic(apperror.BadRequest("price cannot be negative"))
+	}
+
+	var publishTime *time.Time
+	if in.PublishTime != nil && *in.PublishTime != "" {
+		t, err := time.Parse(time.RFC3339, *in.PublishTime)
+		if err != nil {
+			panic(apperror.BadRequest("publish_time must be an RFC3339 timestamp"))
+		}
+		publishTime = &t
+	}
+
+	return ProductWrite{
+		Title:       title,
+		Cover:       in.Cover,
+		Description: in.Description,
+		PublisherID: in.PublisherID,
+		PublishTime: publishTime,
+		Stock:       in.Stock,
+		Price:       in.Price,
+		Status:      in.Status,
+		Type:        in.Type,
+		AuthorIDs:   in.AuthorIDs,
+		GenreIDs:    in.GenreIDs,
+		TagIDs:      in.TagIDs,
+	}
+}
+
+func toResponse(p *Product) ProductResponse {
+	authors := p.AuthorIDs
+	if authors == nil {
+		authors = []string{}
+	}
+	genres := p.GenreIDs
+	if genres == nil {
+		genres = []string{}
+	}
+	tags := p.TagIDs
+	if tags == nil {
+		tags = []string{}
+	}
+
+	return ProductResponse{
+		ID:          p.PublicID,
+		Title:       p.Title,
+		Cover:       p.Cover,
+		Description: p.Description,
+		PublisherID: p.PublisherID,
+		PublishTime: timeToString(p.PublishTime),
+		Stock:       p.Stock,
+		Price:       p.Price,
+		Status:      p.Status,
+		Type:        p.Type,
+		AuthorIDs:   authors,
+		GenreIDs:    genres,
+		TagIDs:      tags,
+		CreateTime:  p.CreateTime.Format(time.RFC3339),
+		UpdateTime:  p.UpdateTime.Format(time.RFC3339),
+	}
+}
+
+func timeToString(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	s := t.Format(time.RFC3339)
+	return &s
+}
+
+func int2FromPtr(v *int16) pgtype.Int2 {
+	if v == nil {
+		return pgtype.Int2{}
+	}
+	return pgtype.Int2{Int16: *v, Valid: true}
+}
+
+func textFromString(s string) pgtype.Text {
+	if s == "" {
+		return pgtype.Text{}
+	}
+	return pgtype.Text{String: s, Valid: true}
+}
+
+func float8FromPtr(v *float64) pgtype.Float8 {
+	if v == nil {
+		return pgtype.Float8{}
+	}
+	return pgtype.Float8{Float64: *v, Valid: true}
+}
