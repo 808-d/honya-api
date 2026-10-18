@@ -7,7 +7,11 @@ import (
 	"github.com/808-d/honya-api/internal/config"
 	appmw "github.com/808-d/honya-api/internal/middleware"
 	"github.com/808-d/honya-api/internal/modules/auth"
-	"github.com/808-d/honya-api/internal/modules/catalog"
+	"github.com/808-d/honya-api/internal/modules/author"
+	"github.com/808-d/honya-api/internal/modules/genre"
+	"github.com/808-d/honya-api/internal/modules/product"
+	"github.com/808-d/honya-api/internal/modules/publisher"
+	"github.com/808-d/honya-api/internal/modules/tag"
 	"github.com/808-d/honya-api/pkg/jwt"
 	"github.com/808-d/honya-api/pkg/mailer"
 	"github.com/808-d/honya-api/pkg/verification"
@@ -52,15 +56,21 @@ func New(db *pgxpool.Pool, rdb *redis.Client, cfg *config.Config) http.Handler {
 		cfg.AppEnv == "production",
 	)
 
-	catalogHandler := catalog.NewHandler(catalog.NewService(catalog.NewRepository(db)))
+	productHandler := product.NewHandler(product.NewService(product.NewRepository(db)))
+	authorHandler := author.NewHandler(author.NewService(author.NewRepository(db)))
+	genreHandler := genre.NewHandler(genre.NewService(genre.NewRepository(db)))
+	publisherHandler := publisher.NewHandler(publisher.NewService(publisher.NewRepository(db)))
+	tagHandler := tag.NewHandler(tag.NewService(tag.NewRepository(db)))
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Route("/auth", func(r chi.Router) {
 			authHandler.RegisterRoutes(r)
 		})
-		r.Route("/catalog", func(r chi.Router) {
-			catalogHandler.RegisterRoutes(r)
-		})
+		productHandler.RegisterRoutes(r)
+		authorHandler.RegisterRoutes(r)
+		genreHandler.RegisterRoutes(r)
+		publisherHandler.RegisterRoutes(r)
+		tagHandler.RegisterRoutes(r)
 	})
 
 	return r

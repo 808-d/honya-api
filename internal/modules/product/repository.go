@@ -1,4 +1,4 @@
-package catalog
+package product
 
 import (
 	"context"
@@ -68,6 +68,7 @@ func (r *Repository) GetByPublicID(ctx context.Context, publicID string) (*Produ
 		CreateTime:  row.CreateTime.Time,
 		UpdateTime:  row.UpdateTime.Time,
 	}
+	// TODO: using join
 	if err := r.loadRelations(ctx, product); err != nil {
 		return nil, err
 	}

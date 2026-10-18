@@ -1,4 +1,4 @@
-package catalog
+package product
 
 // ProductInput is the body of the create and update product endpoints.
 type ProductInput struct {
