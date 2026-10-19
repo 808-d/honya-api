@@ -109,10 +109,13 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) *RegisterRe
 		panic(err)
 	}
 
-	link := fmt.Sprintf("%s/api/v1/auth/register/verify?id=%s&token=%s",
+	link := fmt.Sprintf("%s/verify-email?id=%s&token=%s",
 		s.appBaseURL, user.PublicID, token)
-	if err := s.mailer.Send(ctx, user.Email, "Verify your honya account",
-		"Confirm your email by opening this link: "+link); err != nil {
+	msg, err := verificationEmail(user.Email, user.Username, link, expiryText(s.codes.TTL()))
+	if err != nil {
+		panic(err)
+	}
+	if err := s.mailer.Send(ctx, msg); err != nil {
 		panic(err)
 	}
 
@@ -181,8 +184,11 @@ func (s *Service) ForgotPassword(ctx context.Context, req ForgotPasswordRequest)
 
 	link := fmt.Sprintf("%s/reset-password?id=%s&token=%s",
 		s.webBaseURL, user.PublicID, token)
-	if err := s.mailer.Send(ctx, user.Email, "Reset your honya password",
-		"Reset your password by opening this link: "+link); err != nil {
+	msg, err := passwordResetEmail(user.Email, user.Username, link, expiryText(s.codes.TTL()))
+	if err != nil {
+		panic(err)
+	}
+	if err := s.mailer.Send(ctx, msg); err != nil {
 		panic(err)
 	}
 }
@@ -210,6 +216,25 @@ func (s *Service) ResetPassword(ctx context.Context, req ResetPasswordRequest) {
 	}
 }
 
+// Me decodes an access token and returns the credential set it carries,
+// without touching the database. It panics with an *apperror.Error when the
+// token is invalid or expired.
+func (s *Service) Me(token string) *MeResponse {
+	claims, err := s.tokens.Parse(token)
+	if err != nil {
+		panic(apperror.Unauthorized("invalid or expired token"))
+	}
+
+	return &MeResponse{
+		ID:          claims.UserID,
+		Username:    claims.Username,
+		DisplayName: claims.DisplayName,
+		Email:       claims.Email,
+		Phone:       claims.Phone,
+		Roles:       claims.Roles,
+	}
+}
+
 // issueResult loads roles and mints an access token for the user.
 func (s *Service) issueResult(ctx context.Context, user *User) *LoginResult {
 	roles, err := s.repo.RolesByUserID(ctx, user.ID)
@@ -217,7 +242,7 @@ func (s *Service) issueResult(ctx context.Context, user *User) *LoginResult {
 		panic(err)
 	}
 
-	token, expiresAt, err := s.tokens.GenerateAccessToken(user.PublicID, user.Username, roles)
+	token, expiresAt, err := s.tokens.GenerateAccessToken(user.PublicID, user.Username, user.DisplayName, user.Email, user.Phone, roles)
 	if err != nil {
 		panic(err)
 	}

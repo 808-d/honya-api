@@ -18,12 +18,16 @@ type Config struct {
 	JWTSecret       string
 	JWTAccessTTLMin int
 
-	// URLs used to build verification / reset links
+	// Frontend URLs used to build the verification / reset links in emails
 	AppBaseURL string
 	WebBaseURL string
 
 	// Verification tokens
 	VerificationTTLMin int
+
+	// Gmail transactional mail (leave empty to log instead of sending)
+	SMTPEmail   string
+	AppPassword string
 
 	// Redis
 	RedisAddr     string
@@ -44,10 +48,13 @@ func Load() (*Config, error) {
 		JWTSecret:       getEnv("JWT_SECRET", "change-me-super-secret"),
 		JWTAccessTTLMin: getInt("JWT_ACCESS_TTL_MINUTES", 15),
 
-		AppBaseURL: getEnv("APP_BASE_URL", "http://localhost:8080"),
-		WebBaseURL: getEnv("WEB_BASE_URL", "http://localhost:3000"),
+		AppBaseURL: getEnv("APP_BASE_URL", "http://localhost:5173"),
+		WebBaseURL: getEnv("WEB_BASE_URL", "http://localhost:5173"),
 
-		VerificationTTLMin: getInt("VERIFICATION_TTL_MINUTES", 15),
+		VerificationTTLMin: getInt("VERIFICATION_TTL_MINUTES", 30),
+
+		SMTPEmail:   getEnv("SMTP_EMAIL", ""),
+		AppPassword: getEnv("APP_PASSWORD", ""),
 
 		RedisAddr:     getEnv("REDIS_ADDR", "localhost:6379"),
 		RedisPassword: getEnv("REDIS_PASSWORD", ""),

@@ -36,8 +36,6 @@ type CartItems struct {
 	Quantity   int32              `json:"quantity"`
 	CreateTime pgtype.Timestamptz `json:"create_time"`
 	UpdateTime pgtype.Timestamptz `json:"update_time"`
-	IsDelete   bool               `json:"is_delete"`
-	DeleteAt   pgtype.Timestamptz `json:"delete_at"`
 }
 
 type Carts struct {
@@ -45,8 +43,6 @@ type Carts struct {
 	UserID     int64              `json:"user_id"`
 	CreateTime pgtype.Timestamptz `json:"create_time"`
 	UpdateTime pgtype.Timestamptz `json:"update_time"`
-	IsDelete   bool               `json:"is_delete"`
-	DeleteAt   pgtype.Timestamptz `json:"delete_at"`
 }
 
 type CouponUsages struct {

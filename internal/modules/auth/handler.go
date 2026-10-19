@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/808-d/honya-api/internal/shared/apperror"
@@ -88,6 +89,17 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	response.OK(w, "password has been reset", nil)
 }
 
+// Me handles GET /auth/me. It decodes the access token from the cookie (or
+// Bearer header) and returns the credentials carried by it.
+func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
+	token := accessToken(r)
+	if token == "" {
+		panic(apperror.Unauthorized("authentication required"))
+	}
+
+	response.OK(w, "authenticated", h.svc.Me(token))
+}
+
 func (h *Handler) setAuthCookie(w http.ResponseWriter, result *LoginResult) {
 	expiresAt := time.Unix(result.ExpiresAt, 0)
 	http.SetCookie(w, &http.Cookie{
@@ -105,4 +117,14 @@ func (h *Handler) setAuthCookie(w http.ResponseWriter, result *LoginResult) {
 func decode(r *http.Request, dst any) error {
 	defer r.Body.Close()
 	return json.NewDecoder(r.Body).Decode(dst)
+}
+
+func accessToken(r *http.Request) string {
+	if c, err := r.Cookie(accessTokenCookie); err == nil && c.Value != "" {
+		return c.Value
+	}
+	if header := r.Header.Get("Authorization"); strings.HasPrefix(header, "Bearer ") {
+		return strings.TrimPrefix(header, "Bearer ")
+	}
+	return ""
 }

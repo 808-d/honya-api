@@ -8,6 +8,7 @@ import (
 	appmw "github.com/808-d/honya-api/internal/middleware"
 	"github.com/808-d/honya-api/internal/modules/auth"
 	"github.com/808-d/honya-api/internal/modules/author"
+	"github.com/808-d/honya-api/internal/modules/cart"
 	"github.com/808-d/honya-api/internal/modules/genre"
 	"github.com/808-d/honya-api/internal/modules/product"
 	"github.com/808-d/honya-api/internal/modules/publisher"
@@ -28,6 +29,7 @@ func New(db *pgxpool.Pool, rdb *redis.Client, cfg *config.Config) http.Handler {
 	r.Use(chimw.RequestID)
 	r.Use(chimw.ClientIPFromRemoteAddr)
 	r.Use(chimw.Logger)
+	r.Use(appmw.CORS(cfg.WebBaseURL, cfg.AppEnv != "production"))
 	r.Use(appmw.ExceptionHandler)
 	r.Use(appmw.RateLimit(100, time.Minute))
 
@@ -49,7 +51,7 @@ func New(db *pgxpool.Pool, rdb *redis.Client, cfg *config.Config) http.Handler {
 			auth.NewRepository(db),
 			tokenManager,
 			codes,
-			mailer.NewDummy(),
+			mailer.New(cfg.SMTPEmail, cfg.AppPassword),
 			cfg.AppBaseURL,
 			cfg.WebBaseURL,
 		),
@@ -61,6 +63,7 @@ func New(db *pgxpool.Pool, rdb *redis.Client, cfg *config.Config) http.Handler {
 	genreHandler := genre.NewHandler(genre.NewService(genre.NewRepository(db)))
 	publisherHandler := publisher.NewHandler(publisher.NewService(publisher.NewRepository(db)))
 	tagHandler := tag.NewHandler(tag.NewService(tag.NewRepository(db)))
+	cartHandler := cart.NewHandler(cart.NewService(cart.NewRepository(db)))
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Route("/auth", func(r chi.Router) {
@@ -71,6 +74,11 @@ func New(db *pgxpool.Pool, rdb *redis.Client, cfg *config.Config) http.Handler {
 		genreHandler.RegisterRoutes(r)
 		publisherHandler.RegisterRoutes(r)
 		tagHandler.RegisterRoutes(r)
+
+		r.Group(func(r chi.Router) {
+			r.Use(appmw.Auth(tokenManager))
+			cartHandler.RegisterRoutes(r)
+		})
 	})
 
 	return r

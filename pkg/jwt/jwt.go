@@ -11,9 +11,12 @@ var ErrInvalidToken = errors.New("invalid token")
 
 // Claims is the payload carried by every access token.
 type Claims struct {
-	UserID   string   `json:"user_id"`
-	Username string   `json:"username"`
-	Roles    []string `json:"roles"`
+	UserID      string   `json:"user_id"`
+	Username    string   `json:"username"`
+	DisplayName string   `json:"display_name,omitempty"`
+	Email       string   `json:"email,omitempty"`
+	Phone       *string  `json:"phone,omitempty"`
+	Roles       []string `json:"roles"`
 	jwt.RegisteredClaims
 }
 
@@ -33,14 +36,17 @@ func NewManager(secret, issuer string, accessTTL time.Duration) *Manager {
 }
 
 // GenerateAccessToken returns a signed token and its expiry as a unix timestamp.
-func (m *Manager) GenerateAccessToken(userID, username string, roles []string) (string, int64, error) {
+func (m *Manager) GenerateAccessToken(userID, username, displayName, email string, phone *string, roles []string) (string, int64, error) {
 	now := time.Now()
 	expiresAt := now.Add(m.accessTTL)
 
 	claims := Claims{
-		UserID:   userID,
-		Username: username,
-		Roles:    roles,
+		UserID:      userID,
+		Username:    username,
+		DisplayName: displayName,
+		Email:       email,
+		Phone:       phone,
+		Roles:       roles,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,
 			Issuer:    m.issuer,

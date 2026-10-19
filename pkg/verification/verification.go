@@ -23,6 +23,11 @@ func NewStore(rdb *redis.Client, ttl time.Duration) *Store {
 	return &Store{rdb: rdb, ttl: ttl}
 }
 
+// TTL reports how long saved tokens stay valid.
+func (s *Store) TTL() time.Duration {
+	return s.ttl
+}
+
 // NewToken returns a URL-safe random token.
 func NewToken() (string, error) {
 	b := make([]byte, 32)

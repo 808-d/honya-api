@@ -30,6 +30,16 @@ type LoginResponse struct {
 	User      UserResponse `json:"user"`
 }
 
+// MeResponse is the credential set decoded from an access token.
+type MeResponse struct {
+	ID          string   `json:"id"`
+	Username    string   `json:"username"`
+	DisplayName string   `json:"display_name"`
+	Email       string   `json:"email"`
+	Phone       *string  `json:"phone,omitempty"`
+	Roles       []string `json:"roles"`
+}
+
 // RegisterRequest is the body of POST /auth/register.
 type RegisterRequest struct {
 	Username    string `json:"username"`

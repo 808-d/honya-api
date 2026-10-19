@@ -12,11 +12,13 @@ type Querier interface {
 	AddProductAuthors(ctx context.Context, db DBTX, arg AddProductAuthorsParams) error
 	AddProductGenres(ctx context.Context, db DBTX, arg AddProductGenresParams) error
 	AddProductTags(ctx context.Context, db DBTX, arg AddProductTagsParams) error
+	AddToCart(ctx context.Context, db DBTX, arg AddToCartParams) (AddToCartRow, error)
 	AssignRoleByName(ctx context.Context, db DBTX, arg AssignRoleByNameParams) error
 	ClearProductAuthors(ctx context.Context, db DBTX, productID int64) error
 	ClearProductGenres(ctx context.Context, db DBTX, productID int64) error
 	ClearProductTags(ctx context.Context, db DBTX, productID int64) error
 	CountAuthors(ctx context.Context, db DBTX) (int64, error)
+	CountCartItems(ctx context.Context, db DBTX, cartID int64) (int64, error)
 	CountGenres(ctx context.Context, db DBTX) (int64, error)
 	CountProducts(ctx context.Context, db DBTX, arg CountProductsParams) (int64, error)
 	CountPublishers(ctx context.Context, db DBTX) (int64, error)
@@ -31,7 +33,9 @@ type Querier interface {
 	FindUserByEmail(ctx context.Context, db DBTX, email string) (FindUserByEmailRow, error)
 	FindUserByIdentifier(ctx context.Context, db DBTX, email string) (FindUserByIdentifierRow, error)
 	GetAuthorByPublicID(ctx context.Context, db DBTX, publicID string) (GetAuthorByPublicIDRow, error)
+	GetCartItems(ctx context.Context, db DBTX, cartID int64) ([]GetCartItemsRow, error)
 	GetGenreByPublicID(ctx context.Context, db DBTX, publicID string) (GetGenreByPublicIDRow, error)
+	GetOrCreateCart(ctx context.Context, db DBTX, userPublicID string) (int64, error)
 	GetProductAuthorIDs(ctx context.Context, db DBTX, productID int64) ([]string, error)
 	GetProductByPublicID(ctx context.Context, db DBTX, publicID string) (GetProductByPublicIDRow, error)
 	GetProductGenreIDs(ctx context.Context, db DBTX, productID int64) ([]string, error)
@@ -44,6 +48,7 @@ type Querier interface {
 	ListProducts(ctx context.Context, db DBTX, arg ListProductsParams) ([]ListProductsRow, error)
 	ListPublishers(ctx context.Context, db DBTX, arg ListPublishersParams) ([]ListPublishersRow, error)
 	ListTags(ctx context.Context, db DBTX, arg ListTagsParams) ([]ListTagsRow, error)
+	RemoveFromCart(ctx context.Context, db DBTX, arg RemoveFromCartParams) (RemoveFromCartRow, error)
 	SoftDeleteAuthor(ctx context.Context, db DBTX, publicID string) (int64, error)
 	SoftDeleteGenre(ctx context.Context, db DBTX, publicID string) (int64, error)
 	SoftDeleteProduct(ctx context.Context, db DBTX, publicID string) (int64, error)
