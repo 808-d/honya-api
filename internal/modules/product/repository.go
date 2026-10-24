@@ -2,10 +2,9 @@ package product
 
 import (
 	"context"
-	"time"
 
 	"github.com/808-d/honya-api/internal/database/sqlc"
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/808-d/honya-api/internal/shared/utils"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -31,8 +30,8 @@ func (r *Repository) List(ctx context.Context, params sqlc.ListProductsParams) (
 			Title:       row.Title,
 			Cover:       row.Cover,
 			Description: row.Description,
-			PublisherID: optionalString(row.PublisherID),
-			PublishTime: timePtr(row.PublishTime),
+			PublisherID: utils.OptionalString(row.PublisherID),
+			PublishTime: utils.TimestamptzPtr(row.PublishTime),
 			Stock:       row.Stock,
 			Price:       row.Price,
 			Status:      row.Status,
@@ -59,8 +58,8 @@ func (r *Repository) GetByPublicID(ctx context.Context, publicID string) (*Produ
 		Title:       row.Title,
 		Cover:       row.Cover,
 		Description: row.Description,
-		PublisherID: optionalString(row.PublisherID),
-		PublishTime: timePtr(row.PublishTime),
+		PublisherID: utils.OptionalString(row.PublisherID),
+		PublishTime: utils.TimestamptzPtr(row.PublishTime),
 		Stock:       row.Stock,
 		Price:       row.Price,
 		Status:      row.Status,
@@ -86,8 +85,8 @@ func (r *Repository) Create(ctx context.Context, in ProductWrite) (*Product, err
 		Title:       in.Title,
 		Cover:       in.Cover,
 		Description: in.Description,
-		PublisherID: textFromPtr(in.PublisherID),
-		PublishTime: timestamptzFromPtr(in.PublishTime),
+		PublisherID: utils.TextFromPtr(in.PublisherID),
+		PublishTime: utils.TimestamptzFromPtr(in.PublishTime),
 		Stock:       in.Stock,
 		Price:       in.Price,
 		Status:      in.Status,
@@ -116,8 +115,8 @@ func (r *Repository) Update(ctx context.Context, publicID string, in ProductWrit
 		Title:       in.Title,
 		Cover:       in.Cover,
 		Description: in.Description,
-		PublisherID: textFromPtr(in.PublisherID),
-		PublishTime: timestamptzFromPtr(in.PublishTime),
+		PublisherID: utils.TextFromPtr(in.PublisherID),
+		PublishTime: utils.TimestamptzFromPtr(in.PublishTime),
 		Stock:       in.Stock,
 		Price:       in.Price,
 		Status:      in.Status,
@@ -186,33 +185,4 @@ func (r *Repository) setRelations(ctx context.Context, db sqlc.DBTX, productID i
 		}
 	}
 	return nil
-}
-
-func optionalString(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
-func textFromPtr(s *string) pgtype.Text {
-	if s == nil || *s == "" {
-		return pgtype.Text{}
-	}
-	return pgtype.Text{String: *s, Valid: true}
-}
-
-func timestamptzFromPtr(t *time.Time) pgtype.Timestamptz {
-	if t == nil {
-		return pgtype.Timestamptz{}
-	}
-	return pgtype.Timestamptz{Time: *t, Valid: true}
-}
-
-func timePtr(ts pgtype.Timestamptz) *time.Time {
-	if !ts.Valid {
-		return nil
-	}
-	t := ts.Time
-	return &t
 }

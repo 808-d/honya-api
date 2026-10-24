@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/808-d/honya-api/internal/shared/apperror"
+	"github.com/808-d/honya-api/internal/shared/utils"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 const (
@@ -66,7 +66,10 @@ func (s *Service) Create(ctx context.Context, in Input) Response {
 	}
 	g, err := s.repo.Create(ctx, name)
 	if err != nil {
-		panic(conflictOnDuplicate(err))
+		if utils.IsUniqueViolation(err) {
+			panic(apperror.Conflict("tag name already exists"))
+		}
+		panic(err)
 	}
 	return toResponse(g)
 }
@@ -81,17 +84,12 @@ func (s *Service) Update(ctx context.Context, publicID string, in Input) Respons
 		if errors.Is(err, pgx.ErrNoRows) {
 			panic(apperror.NotFound("tag not found"))
 		}
-		panic(conflictOnDuplicate(err))
+		if utils.IsUniqueViolation(err) {
+			panic(apperror.Conflict("tag name already exists"))
+		}
+		panic(err)
 	}
 	return toResponse(g)
-}
-
-func conflictOnDuplicate(err error) error {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-		return apperror.Conflict("tag name already exists")
-	}
-	return err
 }
 
 func (s *Service) Delete(ctx context.Context, publicID string) {

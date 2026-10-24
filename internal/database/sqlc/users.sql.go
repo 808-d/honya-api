@@ -180,6 +180,20 @@ func (q *Queries) GetRoleNamesByUserID(ctx context.Context, db DBTX, userID int6
 	return items, nil
 }
 
+const GetUserIDByPublicID = `-- name: GetUserIDByPublicID :one
+SELECT id
+FROM users
+WHERE public_id::text = $1::text
+  AND is_delete = false
+`
+
+func (q *Queries) GetUserIDByPublicID(ctx context.Context, db DBTX, publicID string) (int64, error) {
+	row := db.QueryRow(ctx, GetUserIDByPublicID, publicID)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const UpdateUserPassword = `-- name: UpdateUserPassword :exec
 UPDATE users
 SET hash_password = $1

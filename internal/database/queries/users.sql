@@ -47,6 +47,12 @@ SET hash_password = sqlc.arg(hash_password)
 WHERE public_id::text = sqlc.arg(public_id)::text
   AND is_delete = false;
 
+-- name: GetUserIDByPublicID :one
+SELECT id
+FROM users
+WHERE public_id::text = sqlc.arg(public_id)::text
+  AND is_delete = false;
+
 -- name: GetRoleNamesByUserID :many
 SELECT r.name
 FROM roles r

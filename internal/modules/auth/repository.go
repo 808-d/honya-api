@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/808-d/honya-api/internal/database/sqlc"
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/808-d/honya-api/internal/shared/utils"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -30,7 +30,7 @@ func (r *Repository) FindByIdentifier(ctx context.Context, identifier string) (*
 		DisplayName:  row.DisplayName,
 		HashPassword: row.HashPassword,
 		Email:        row.Email,
-		Phone:        textPtr(row.Phone),
+		Phone:        utils.TextPtr(row.Phone),
 		IsVerified:   row.IsVerified,
 	}, nil
 }
@@ -48,7 +48,7 @@ func (r *Repository) FindByEmail(ctx context.Context, email string) (*User, erro
 		DisplayName:  row.DisplayName,
 		HashPassword: row.HashPassword,
 		Email:        row.Email,
-		Phone:        textPtr(row.Phone),
+		Phone:        utils.TextPtr(row.Phone),
 		IsVerified:   row.IsVerified,
 	}, nil
 }
@@ -95,7 +95,7 @@ func (r *Repository) Verify(ctx context.Context, publicID string) (*User, error)
 		Username:    row.Username,
 		DisplayName: row.DisplayName,
 		Email:       row.Email,
-		Phone:       textPtr(row.Phone),
+		Phone:       utils.TextPtr(row.Phone),
 		IsVerified:  true,
 	}, nil
 }
@@ -119,12 +119,4 @@ func (r *Repository) UpdatePassword(ctx context.Context, publicID, hashPassword 
 // RolesByUserID returns the role names assigned to a user.
 func (r *Repository) RolesByUserID(ctx context.Context, userID int64) ([]string, error) {
 	return r.q.GetRoleNamesByUserID(ctx, r.db, userID)
-}
-
-func textPtr(t pgtype.Text) *string {
-	if t.Valid {
-		s := t.String
-		return &s
-	}
-	return nil
 }

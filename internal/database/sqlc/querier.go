@@ -19,21 +19,36 @@ type Querier interface {
 	ClearProductTags(ctx context.Context, db DBTX, productID int64) error
 	CountAuthors(ctx context.Context, db DBTX) (int64, error)
 	CountCartItems(ctx context.Context, db DBTX, cartID int64) (int64, error)
+	CountCouponUsages(ctx context.Context, db DBTX, couponID int64) (int64, error)
+	// ============================================================
+	// Redemption
+	// ============================================================
+	CountCouponUsagesByUser(ctx context.Context, db DBTX, arg CountCouponUsagesByUserParams) (int64, error)
+	CountCoupons(ctx context.Context, db DBTX, arg CountCouponsParams) (int64, error)
 	CountGenres(ctx context.Context, db DBTX) (int64, error)
 	CountProducts(ctx context.Context, db DBTX, arg CountProductsParams) (int64, error)
 	CountPublishers(ctx context.Context, db DBTX) (int64, error)
 	CountTags(ctx context.Context, db DBTX) (int64, error)
 	CreateAuthor(ctx context.Context, db DBTX, name string) (CreateAuthorRow, error)
+	// ============================================================
+	// Coupons
+	// ============================================================
+	CreateCoupon(ctx context.Context, db DBTX, arg CreateCouponParams) (CreateCouponRow, error)
 	CreateGenre(ctx context.Context, db DBTX, name string) (CreateGenreRow, error)
 	CreateProduct(ctx context.Context, db DBTX, arg CreateProductParams) (CreateProductRow, error)
 	CreatePublisher(ctx context.Context, db DBTX, name string) (CreatePublisherRow, error)
 	CreateTag(ctx context.Context, db DBTX, name string) (CreateTagRow, error)
 	CreateUser(ctx context.Context, db DBTX, arg CreateUserParams) (CreateUserRow, error)
+	DecrementCouponUsed(ctx context.Context, db DBTX, id int64) error
+	DeleteCouponUsageByOrder(ctx context.Context, db DBTX, orderID int64) (int64, error)
 	EmailExists(ctx context.Context, db DBTX, email string) (bool, error)
 	FindUserByEmail(ctx context.Context, db DBTX, email string) (FindUserByEmailRow, error)
 	FindUserByIdentifier(ctx context.Context, db DBTX, email string) (FindUserByIdentifierRow, error)
 	GetAuthorByPublicID(ctx context.Context, db DBTX, publicID string) (GetAuthorByPublicIDRow, error)
 	GetCartItems(ctx context.Context, db DBTX, cartID int64) ([]GetCartItemsRow, error)
+	GetCouponByCode(ctx context.Context, db DBTX, code string) (GetCouponByCodeRow, error)
+	GetCouponByCodeForUpdate(ctx context.Context, db DBTX, code string) (GetCouponByCodeForUpdateRow, error)
+	GetCouponByPublicID(ctx context.Context, db DBTX, publicID string) (GetCouponByPublicIDRow, error)
 	GetGenreByPublicID(ctx context.Context, db DBTX, publicID string) (GetGenreByPublicIDRow, error)
 	GetOrCreateCart(ctx context.Context, db DBTX, userPublicID string) (int64, error)
 	GetProductAuthorIDs(ctx context.Context, db DBTX, productID int64) ([]string, error)
@@ -43,23 +58,31 @@ type Querier interface {
 	GetPublisherByPublicID(ctx context.Context, db DBTX, publicID string) (GetPublisherByPublicIDRow, error)
 	GetRoleNamesByUserID(ctx context.Context, db DBTX, userID int64) ([]string, error)
 	GetTagByPublicID(ctx context.Context, db DBTX, publicID string) (GetTagByPublicIDRow, error)
+	GetUserIDByPublicID(ctx context.Context, db DBTX, publicID string) (int64, error)
+	IncrementCouponUsed(ctx context.Context, db DBTX, id int64) (int64, error)
+	InsertCouponUsage(ctx context.Context, db DBTX, arg InsertCouponUsageParams) error
 	ListAuthors(ctx context.Context, db DBTX, arg ListAuthorsParams) ([]ListAuthorsRow, error)
+	ListCouponUsages(ctx context.Context, db DBTX, arg ListCouponUsagesParams) ([]ListCouponUsagesRow, error)
+	ListCoupons(ctx context.Context, db DBTX, arg ListCouponsParams) ([]ListCouponsRow, error)
 	ListGenres(ctx context.Context, db DBTX, arg ListGenresParams) ([]ListGenresRow, error)
 	ListProducts(ctx context.Context, db DBTX, arg ListProductsParams) ([]ListProductsRow, error)
 	ListPublishers(ctx context.Context, db DBTX, arg ListPublishersParams) ([]ListPublishersRow, error)
 	ListTags(ctx context.Context, db DBTX, arg ListTagsParams) ([]ListTagsRow, error)
 	RemoveFromCart(ctx context.Context, db DBTX, arg RemoveFromCartParams) (RemoveFromCartRow, error)
 	SoftDeleteAuthor(ctx context.Context, db DBTX, publicID string) (int64, error)
+	SoftDeleteCoupon(ctx context.Context, db DBTX, publicID string) (int64, error)
 	SoftDeleteGenre(ctx context.Context, db DBTX, publicID string) (int64, error)
 	SoftDeleteProduct(ctx context.Context, db DBTX, publicID string) (int64, error)
 	SoftDeletePublisher(ctx context.Context, db DBTX, publicID string) (int64, error)
 	SoftDeleteTag(ctx context.Context, db DBTX, publicID string) (int64, error)
 	UpdateAuthor(ctx context.Context, db DBTX, arg UpdateAuthorParams) (UpdateAuthorRow, error)
+	UpdateCoupon(ctx context.Context, db DBTX, arg UpdateCouponParams) (UpdateCouponRow, error)
 	UpdateGenre(ctx context.Context, db DBTX, arg UpdateGenreParams) (UpdateGenreRow, error)
 	UpdateProduct(ctx context.Context, db DBTX, arg UpdateProductParams) (UpdateProductRow, error)
 	UpdatePublisher(ctx context.Context, db DBTX, arg UpdatePublisherParams) (UpdatePublisherRow, error)
 	UpdateTag(ctx context.Context, db DBTX, arg UpdateTagParams) (UpdateTagRow, error)
 	UpdateUserPassword(ctx context.Context, db DBTX, arg UpdateUserPasswordParams) error
+	UserHasFeature(ctx context.Context, db DBTX, arg UserHasFeatureParams) (bool, error)
 	UsernameExists(ctx context.Context, db DBTX, username string) (bool, error)
 	VerifyUser(ctx context.Context, db DBTX, publicID string) (VerifyUserRow, error)
 }

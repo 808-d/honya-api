@@ -8,8 +8,8 @@ import (
 
 	"github.com/808-d/honya-api/internal/database/sqlc"
 	"github.com/808-d/honya-api/internal/shared/apperror"
+	"github.com/808-d/honya-api/internal/shared/utils"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const (
@@ -39,11 +39,11 @@ func (s *Service) List(ctx context.Context, filter ListFilter) *ListResult {
 	}
 
 	products, err := s.repo.List(ctx, sqlc.ListProductsParams{
-		FilterStatus: int2FromPtr(filter.Status),
-		FilterType:   int2FromPtr(filter.Type),
-		Search:       textFromString(search),
-		MinPrice:     float8FromPtr(filter.MinPrice),
-		MaxPrice:     float8FromPtr(filter.MaxPrice),
+		FilterStatus: utils.Int2FromPtr(filter.Status),
+		FilterType:   utils.Int2FromPtr(filter.Type),
+		Search:       utils.TextFromString(search),
+		MinPrice:     utils.Float8FromPtr(filter.MinPrice),
+		MaxPrice:     utils.Float8FromPtr(filter.MaxPrice),
 		PageLimit:    int32(filter.PerPage),
 		PageOffset:   int32((filter.Page - 1) * filter.PerPage),
 	})
@@ -52,11 +52,11 @@ func (s *Service) List(ctx context.Context, filter ListFilter) *ListResult {
 	}
 
 	total, err := s.repo.Count(ctx, sqlc.CountProductsParams{
-		FilterStatus: int2FromPtr(filter.Status),
-		FilterType:   int2FromPtr(filter.Type),
-		Search:       textFromString(search),
-		MinPrice:     float8FromPtr(filter.MinPrice),
-		MaxPrice:     float8FromPtr(filter.MaxPrice),
+		FilterStatus: utils.Int2FromPtr(filter.Status),
+		FilterType:   utils.Int2FromPtr(filter.Type),
+		Search:       utils.TextFromString(search),
+		MinPrice:     utils.Float8FromPtr(filter.MinPrice),
+		MaxPrice:     utils.Float8FromPtr(filter.MaxPrice),
 	})
 	if err != nil {
 		panic(err)
@@ -137,13 +137,9 @@ func (s *Service) validate(in ProductInput) ProductWrite {
 		panic(apperror.BadRequest("price cannot be negative"))
 	}
 
-	var publishTime *time.Time
-	if in.PublishTime != nil && *in.PublishTime != "" {
-		t, err := time.Parse(time.RFC3339, *in.PublishTime)
-		if err != nil {
-			panic(apperror.BadRequest("publish_time must be an RFC3339 timestamp"))
-		}
-		publishTime = &t
+	publishTime, err := utils.ParseTimePtr(in.PublishTime)
+	if err != nil {
+		panic(apperror.BadRequest("publish_time must be an RFC3339 timestamp"))
 	}
 
 	return ProductWrite{
@@ -182,7 +178,7 @@ func toResponse(p *Product) ProductResponse {
 		Cover:       p.Cover,
 		Description: p.Description,
 		PublisherID: p.PublisherID,
-		PublishTime: timeToString(p.PublishTime),
+		PublishTime: utils.FormatTimePtr(p.PublishTime),
 		Stock:       p.Stock,
 		Price:       p.Price,
 		Status:      p.Status,
@@ -193,33 +189,4 @@ func toResponse(p *Product) ProductResponse {
 		CreateTime:  p.CreateTime.Format(time.RFC3339),
 		UpdateTime:  p.UpdateTime.Format(time.RFC3339),
 	}
-}
-
-func timeToString(t *time.Time) *string {
-	if t == nil {
-		return nil
-	}
-	s := t.Format(time.RFC3339)
-	return &s
-}
-
-func int2FromPtr(v *int16) pgtype.Int2 {
-	if v == nil {
-		return pgtype.Int2{}
-	}
-	return pgtype.Int2{Int16: *v, Valid: true}
-}
-
-func textFromString(s string) pgtype.Text {
-	if s == "" {
-		return pgtype.Text{}
-	}
-	return pgtype.Text{String: s, Valid: true}
-}
-
-func float8FromPtr(v *float64) pgtype.Float8 {
-	if v == nil {
-		return pgtype.Float8{}
-	}
-	return pgtype.Float8{Float64: *v, Valid: true}
 }

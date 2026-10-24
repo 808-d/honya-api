@@ -52,3 +52,15 @@ func QueryFloat(raw string) *float64 {
 	}
 	return &v
 }
+
+// QueryBool parses an optional boolean query parameter.
+func QueryBool(raw string) *bool {
+	if raw == "" {
+		return nil
+	}
+	v, err := strconv.ParseBool(raw)
+	if err != nil {
+		panic(apperror.BadRequest("invalid boolean query parameter"))
+	}
+	return &v
+}
