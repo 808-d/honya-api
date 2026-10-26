@@ -25,6 +25,9 @@ type Config struct {
 	// Verification tokens
 	VerificationTTLMin int
 
+	// Percentage of the pre-discount subtotal charged as shipping.
+	ShippingFeePercent float64
+
 	// Gmail transactional mail (leave empty to log instead of sending)
 	SMTPEmail   string
 	AppPassword string
@@ -53,6 +56,8 @@ func Load() (*Config, error) {
 
 		VerificationTTLMin: getInt("VERIFICATION_TTL_MINUTES", 30),
 
+		ShippingFeePercent: getFloat("SHIPPING_FEE_PERCENT", 10),
+
 		SMTPEmail:   getEnv("SMTP_EMAIL", ""),
 		AppPassword: getEnv("APP_PASSWORD", ""),
 
@@ -72,6 +77,15 @@ func getEnv(key, fallback string) string {
 func getInt(key string, fallback int) int {
 	if v := os.Getenv(key); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return fallback
+}
+
+func getFloat(key string, fallback float64) float64 {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.ParseFloat(v, 64); err == nil {
 			return n
 		}
 	}

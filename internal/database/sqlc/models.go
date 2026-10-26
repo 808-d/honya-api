@@ -108,6 +108,7 @@ type OrderItems struct {
 	UpdateTime   pgtype.Timestamptz `json:"update_time"`
 	IsDelete     bool               `json:"is_delete"`
 	DeleteAt     pgtype.Timestamptz `json:"delete_at"`
+	ProductCover string             `json:"product_cover"`
 }
 
 type Orders struct {
@@ -131,6 +132,10 @@ type Orders struct {
 	UpdateTime      pgtype.Timestamptz `json:"update_time"`
 	IsDelete        bool               `json:"is_delete"`
 	DeleteAt        pgtype.Timestamptz `json:"delete_at"`
+	// 0=cod
+	PaymentMethod int16 `json:"payment_method"`
+	// When the order was marked paid, if any
+	PaidAt pgtype.Timestamptz `json:"paid_at"`
 }
 
 type ProductAuthors struct {

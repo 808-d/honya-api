@@ -15,9 +15,6 @@ import (
 const (
 	defaultPerPage = 20
 	maxPerPage     = 100
-
-	typeFixed   int16 = 0
-	typePercent int16 = 1
 )
 
 type Service struct {
@@ -250,9 +247,9 @@ func Discount(c *Coupon, subtotal float64) float64 {
 
 	var discount float64
 	switch c.Type {
-	case typeFixed:
+	case CouponTypeFixed:
 		discount = c.Value
-	case typePercent:
+	case CouponTypePercent:
 		discount = subtotal * c.Value / 100
 		if c.MaxDiscount != nil && discount > *c.MaxDiscount {
 			discount = *c.MaxDiscount
@@ -305,13 +302,14 @@ func (s *Service) validateInput(in CouponInput) CouponWrite {
 	if code == "" {
 		panic(apperror.BadRequest("code is required"))
 	}
-	if in.Type != typeFixed && in.Type != typePercent {
-		panic(apperror.BadRequest("type must be 0 (fixed) or 1 (percent)"))
+	couponType := CouponType(in.Type)
+	if !couponType.Valid() {
+		panic(apperror.BadRequest("invalid coupon type"))
 	}
 	if in.Value < 0 {
 		panic(apperror.BadRequest("value cannot be negative"))
 	}
-	if in.Type == typePercent && in.Value > 100 {
+	if couponType == CouponTypePercent && in.Value > 100 {
 		panic(apperror.BadRequest("percent value cannot exceed 100"))
 	}
 	if in.MinOrderAmount < 0 {
@@ -319,7 +317,7 @@ func (s *Service) validateInput(in CouponInput) CouponWrite {
 	}
 
 	var maxDiscount *float64
-	if in.Type == typePercent && in.MaxDiscount != nil {
+	if couponType == CouponTypePercent && in.MaxDiscount != nil {
 		if *in.MaxDiscount < 0 {
 			panic(apperror.BadRequest("max_discount cannot be negative"))
 		}
@@ -356,7 +354,7 @@ func (s *Service) validateInput(in CouponInput) CouponWrite {
 
 	return CouponWrite{
 		Code:           code,
-		Type:           in.Type,
+		Type:           couponType,
 		Value:          in.Value,
 		MinOrderAmount: in.MinOrderAmount,
 		MaxDiscount:    maxDiscount,
@@ -372,7 +370,7 @@ func toResponse(c *Coupon) CouponResponse {
 	return CouponResponse{
 		ID:             c.PublicID,
 		Code:           c.Code,
-		Type:           c.Type,
+		Type:           int16(c.Type),
 		Value:          c.Value,
 		MinOrderAmount: c.MinOrderAmount,
 		MaxDiscount:    c.MaxDiscount,

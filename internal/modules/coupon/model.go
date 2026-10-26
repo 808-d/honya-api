@@ -7,7 +7,7 @@ type Coupon struct {
 	ID             int64
 	PublicID       string
 	Code           string
-	Type           int16
+	Type           CouponType
 	Value          float64
 	MinOrderAmount float64
 	MaxDiscount    *float64
@@ -24,7 +24,7 @@ type Coupon struct {
 // CouponWrite is a validated coupon payload ready to persist.
 type CouponWrite struct {
 	Code           string
-	Type           int16
+	Type           CouponType
 	Value          float64
 	MinOrderAmount float64
 	MaxDiscount    *float64

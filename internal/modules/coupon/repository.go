@@ -43,7 +43,7 @@ func toCoupon(r couponRow) *Coupon {
 		ID:             r.ID,
 		PublicID:       r.PublicID,
 		Code:           r.Code,
-		Type:           r.Type,
+		Type:           CouponType(r.Type),
 		Value:          r.Value,
 		MinOrderAmount: r.MinOrderAmount,
 		MaxDiscount:    utils.NumericPtr(r.MaxDiscount),
@@ -62,7 +62,7 @@ func toCoupon(r couponRow) *Coupon {
 func (r *Repository) Create(ctx context.Context, in CouponWrite) (*Coupon, error) {
 	row, err := r.q.CreateCoupon(ctx, r.db, sqlc.CreateCouponParams{
 		Code:           in.Code,
-		Type:           in.Type,
+		Type:           int16(in.Type),
 		Value:          in.Value,
 		MinOrderAmount: in.MinOrderAmount,
 		MaxDiscount:    utils.Float8FromPtr(in.MaxDiscount),
@@ -82,7 +82,7 @@ func (r *Repository) Create(ctx context.Context, in CouponWrite) (*Coupon, error
 func (r *Repository) Update(ctx context.Context, publicID string, in CouponWrite) (*Coupon, error) {
 	row, err := r.q.UpdateCoupon(ctx, r.db, sqlc.UpdateCouponParams{
 		Code:           in.Code,
-		Type:           in.Type,
+		Type:           int16(in.Type),
 		Value:          in.Value,
 		MinOrderAmount: in.MinOrderAmount,
 		MaxDiscount:    utils.Float8FromPtr(in.MaxDiscount),

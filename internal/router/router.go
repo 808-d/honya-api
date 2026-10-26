@@ -11,6 +11,7 @@ import (
 	"github.com/808-d/honya-api/internal/modules/cart"
 	"github.com/808-d/honya-api/internal/modules/coupon"
 	"github.com/808-d/honya-api/internal/modules/genre"
+	"github.com/808-d/honya-api/internal/modules/order"
 	"github.com/808-d/honya-api/internal/modules/product"
 	"github.com/808-d/honya-api/internal/modules/publisher"
 	"github.com/808-d/honya-api/internal/modules/tag"
@@ -65,7 +66,13 @@ func New(db *pgxpool.Pool, rdb *redis.Client, cfg *config.Config) http.Handler {
 	publisherHandler := publisher.NewHandler(publisher.NewService(publisher.NewRepository(db)))
 	tagHandler := tag.NewHandler(tag.NewService(tag.NewRepository(db)))
 	cartHandler := cart.NewHandler(cart.NewService(cart.NewRepository(db)))
-	couponHandler := coupon.NewHandler(coupon.NewService(coupon.NewRepository(db)))
+	couponService := coupon.NewService(coupon.NewRepository(db))
+	couponHandler := coupon.NewHandler(couponService)
+	orderHandler := order.NewHandler(order.NewService(
+		order.NewRepository(db),
+		couponService,
+		cfg.ShippingFeePercent,
+	))
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Route("/auth", func(r chi.Router) {
@@ -81,6 +88,12 @@ func New(db *pgxpool.Pool, rdb *redis.Client, cfg *config.Config) http.Handler {
 			appmw.Auth(tokenManager),
 			appmw.RequireFeature(db, "coupon.read"),
 			appmw.RequireFeature(db, "coupon.write"),
+		)
+		orderHandler.RegisterRoutes(
+			r,
+			appmw.Auth(tokenManager),
+			appmw.RequireFeature(db, "order.read"),
+			appmw.RequireFeature(db, "order.write"),
 		)
 
 		r.Group(func(r chi.Router) {

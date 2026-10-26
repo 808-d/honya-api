@@ -34,8 +34,8 @@ func (r *Repository) List(ctx context.Context, params sqlc.ListProductsParams) (
 			PublishTime: utils.TimestamptzPtr(row.PublishTime),
 			Stock:       row.Stock,
 			Price:       row.Price,
-			Status:      row.Status,
-			Type:        row.Type,
+			Status:      ProductStatus(row.Status),
+			Type:        ProductType(row.Type),
 			CreateTime:  row.CreateTime.Time,
 			UpdateTime:  row.UpdateTime.Time,
 		})
@@ -62,8 +62,8 @@ func (r *Repository) GetByPublicID(ctx context.Context, publicID string) (*Produ
 		PublishTime: utils.TimestamptzPtr(row.PublishTime),
 		Stock:       row.Stock,
 		Price:       row.Price,
-		Status:      row.Status,
-		Type:        row.Type,
+		Status:      ProductStatus(row.Status),
+		Type:        ProductType(row.Type),
 		CreateTime:  row.CreateTime.Time,
 		UpdateTime:  row.UpdateTime.Time,
 	}
@@ -89,8 +89,8 @@ func (r *Repository) Create(ctx context.Context, in ProductWrite) (*Product, err
 		PublishTime: utils.TimestamptzFromPtr(in.PublishTime),
 		Stock:       in.Stock,
 		Price:       in.Price,
-		Status:      in.Status,
-		Type:        in.Type,
+		Status:      int16(in.Status),
+		Type:        int16(in.Type),
 	})
 	if err != nil {
 		return nil, err
@@ -119,8 +119,8 @@ func (r *Repository) Update(ctx context.Context, publicID string, in ProductWrit
 		PublishTime: utils.TimestamptzFromPtr(in.PublishTime),
 		Stock:       in.Stock,
 		Price:       in.Price,
-		Status:      in.Status,
-		Type:        in.Type,
+		Status:      int16(in.Status),
+		Type:        int16(in.Type),
 		PublicID:    publicID,
 	})
 	if err != nil {

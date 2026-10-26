@@ -57,6 +57,23 @@ func Int2FromPtr(v *int16) pgtype.Int2 {
 	return pgtype.Int2{Int16: *v, Valid: true}
 }
 
+// Int8Ptr converts a nullable int8 column into a pointer.
+func Int8Ptr(v pgtype.Int8) *int64 {
+	if !v.Valid {
+		return nil
+	}
+	n := v.Int64
+	return &n
+}
+
+// Int8FromPtr converts a pointer into a nullable int8 parameter.
+func Int8FromPtr(v *int64) pgtype.Int8 {
+	if v == nil {
+		return pgtype.Int8{}
+	}
+	return pgtype.Int8{Int64: *v, Valid: true}
+}
+
 // Int4Ptr converts a nullable int4 column into a pointer.
 func Int4Ptr(v pgtype.Int4) *int32 {
 	if !v.Valid {

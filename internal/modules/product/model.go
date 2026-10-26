@@ -13,8 +13,8 @@ type Product struct {
 	PublishTime *time.Time
 	Stock       int32
 	Price       float64
-	Status      int16
-	Type        int16
+	Status      ProductStatus
+	Type        ProductType
 	CreateTime  time.Time
 	UpdateTime  time.Time
 	AuthorIDs   []string
@@ -31,8 +31,8 @@ type ProductWrite struct {
 	PublishTime *time.Time
 	Stock       int32
 	Price       float64
-	Status      int16
-	Type        int16
+	Status      ProductStatus
+	Type        ProductType
 	AuthorIDs   []string
 	GenreIDs    []string
 	TagIDs      []string

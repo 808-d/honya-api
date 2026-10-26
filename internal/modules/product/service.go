@@ -124,11 +124,13 @@ func (s *Service) validate(in ProductInput) ProductWrite {
 	if title == "" {
 		panic(apperror.BadRequest("title is required"))
 	}
-	if in.Status < 0 || in.Status > 2 {
-		panic(apperror.BadRequest("status must be between 0 and 2"))
+	status := ProductStatus(in.Status)
+	if !status.Valid() {
+		panic(apperror.BadRequest("invalid product status"))
 	}
-	if in.Type < 0 || in.Type > 4 {
-		panic(apperror.BadRequest("type must be between 0 and 4"))
+	productType := ProductType(in.Type)
+	if !productType.Valid() {
+		panic(apperror.BadRequest("invalid product type"))
 	}
 	if in.Stock < 0 {
 		panic(apperror.BadRequest("stock cannot be negative"))
@@ -150,8 +152,8 @@ func (s *Service) validate(in ProductInput) ProductWrite {
 		PublishTime: publishTime,
 		Stock:       in.Stock,
 		Price:       in.Price,
-		Status:      in.Status,
-		Type:        in.Type,
+		Status:      status,
+		Type:        productType,
 		AuthorIDs:   in.AuthorIDs,
 		GenreIDs:    in.GenreIDs,
 		TagIDs:      in.TagIDs,
@@ -181,8 +183,8 @@ func toResponse(p *Product) ProductResponse {
 		PublishTime: utils.FormatTimePtr(p.PublishTime),
 		Stock:       p.Stock,
 		Price:       p.Price,
-		Status:      p.Status,
-		Type:        p.Type,
+		Status:      int16(p.Status),
+		Type:        int16(p.Type),
 		AuthorIDs:   authors,
 		GenreIDs:    genres,
 		TagIDs:      tags,
