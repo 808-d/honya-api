@@ -260,3 +260,23 @@ func (s *Service) issueResult(ctx context.Context, user *User) *LoginResult {
 		},
 	}
 }
+
+// Permissions returns the caller's live roles and features. Unlike Me it reads
+// the database, so role and feature changes apply without a new login.
+func (s *Service) Permissions(ctx context.Context, publicID string) *PermissionsResponse {
+	roles, err := s.repo.RolesByPublicID(ctx, publicID)
+	if err != nil {
+		panic(err)
+	}
+	features, err := s.repo.FeaturesByPublicID(ctx, publicID)
+	if err != nil {
+		panic(err)
+	}
+	if roles == nil {
+		roles = []string{}
+	}
+	if features == nil {
+		features = []string{}
+	}
+	return &PermissionsResponse{Roles: roles, Features: features}
+}

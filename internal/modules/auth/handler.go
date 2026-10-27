@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/808-d/honya-api/internal/middleware"
 	"github.com/808-d/honya-api/internal/shared/apperror"
 	"github.com/808-d/honya-api/internal/shared/response"
 )
@@ -127,4 +128,25 @@ func accessToken(r *http.Request) string {
 		return strings.TrimPrefix(header, "Bearer ")
 	}
 	return ""
+}
+
+// Logout clears the access-token cookie.
+func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     accessTokenCookie,
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   h.secureCookie,
+		SameSite: http.SameSiteLaxMode,
+		Expires:  time.Unix(0, 0),
+		MaxAge:   -1,
+	})
+	response.OK(w, "logged out", nil)
+}
+
+// Permissions handles GET /auth/permissions.
+func (h *Handler) Permissions(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.UserIDFromContext(r.Context())
+	response.OK(w, "permissions retrieved", h.svc.Permissions(r.Context(), userID))
 }

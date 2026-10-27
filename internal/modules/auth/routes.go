@@ -9,5 +9,6 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Get("/register/verify", h.VerifyRegister)
 	r.Post("/password/forgot", h.ForgotPassword)
 	r.Post("/password/reset", h.ResetPassword)
+	r.Post("/logout", h.Logout)
 	r.Get("/me", h.Me)
 }

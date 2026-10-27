@@ -67,3 +67,9 @@ type ResetPasswordRequest struct {
 	Token       string `json:"token"`
 	NewPassword string `json:"new_password"`
 }
+
+// PermissionsResponse is the live role/feature set for the signed-in user.
+type PermissionsResponse struct {
+	Roles    []string `json:"roles"`
+	Features []string `json:"features"`
+}

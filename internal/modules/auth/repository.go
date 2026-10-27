@@ -120,3 +120,13 @@ func (r *Repository) UpdatePassword(ctx context.Context, publicID, hashPassword 
 func (r *Repository) RolesByUserID(ctx context.Context, userID int64) ([]string, error) {
 	return r.q.GetRoleNamesByUserID(ctx, r.db, userID)
 }
+
+// RolesByPublicID returns the live role labels assigned to a user.
+func (r *Repository) RolesByPublicID(ctx context.Context, publicID string) ([]string, error) {
+	return r.q.GetRoleNamesByPublicID(ctx, r.db, publicID)
+}
+
+// FeaturesByPublicID returns the live feature codes granted by a user's roles.
+func (r *Repository) FeaturesByPublicID(ctx context.Context, publicID string) ([]string, error) {
+	return r.q.GetFeatureCodesByPublicID(ctx, r.db, publicID)
+}

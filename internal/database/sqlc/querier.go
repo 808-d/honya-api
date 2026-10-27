@@ -6,6 +6,8 @@ package sqlc
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
@@ -25,12 +27,16 @@ type Querier interface {
 	// ============================================================
 	CountCouponUsagesByUser(ctx context.Context, db DBTX, arg CountCouponUsagesByUserParams) (int64, error)
 	CountCoupons(ctx context.Context, db DBTX, arg CountCouponsParams) (int64, error)
+	CountFeaturesByPublicIDs(ctx context.Context, db DBTX, publicIds []string) (int64, error)
 	CountGenres(ctx context.Context, db DBTX) (int64, error)
 	CountOrders(ctx context.Context, db DBTX, arg CountOrdersParams) (int64, error)
 	CountOrdersForUser(ctx context.Context, db DBTX, arg CountOrdersForUserParams) (int64, error)
 	CountProducts(ctx context.Context, db DBTX, arg CountProductsParams) (int64, error)
 	CountPublishers(ctx context.Context, db DBTX) (int64, error)
+	CountRolesByPublicIDs(ctx context.Context, db DBTX, publicIds []string) (int64, error)
 	CountTags(ctx context.Context, db DBTX) (int64, error)
+	CountUsers(ctx context.Context, db DBTX, search pgtype.Text) (int64, error)
+	CouponStats(ctx context.Context, db DBTX) (CouponStatsRow, error)
 	CreateAuthor(ctx context.Context, db DBTX, name string) (CreateAuthorRow, error)
 	// ============================================================
 	// Coupons
@@ -41,12 +47,15 @@ type Querier interface {
 	CreateOrderItem(ctx context.Context, db DBTX, arg CreateOrderItemParams) error
 	CreateProduct(ctx context.Context, db DBTX, arg CreateProductParams) (CreateProductRow, error)
 	CreatePublisher(ctx context.Context, db DBTX, name string) (CreatePublisherRow, error)
+	CreateRole(ctx context.Context, db DBTX, arg CreateRoleParams) (CreateRoleRow, error)
 	CreateTag(ctx context.Context, db DBTX, name string) (CreateTagRow, error)
 	CreateUser(ctx context.Context, db DBTX, arg CreateUserParams) (CreateUserRow, error)
 	DecrementCouponUsed(ctx context.Context, db DBTX, id int64) error
 	DecrementProductStock(ctx context.Context, db DBTX, arg DecrementProductStockParams) (int64, error)
 	DeleteCartItems(ctx context.Context, db DBTX, cartID int64) error
 	DeleteCouponUsageByOrder(ctx context.Context, db DBTX, orderID int64) (int64, error)
+	DeleteRoleFeatures(ctx context.Context, db DBTX, roleID int64) error
+	DeleteUserRoles(ctx context.Context, db DBTX, userID int64) error
 	EmailExists(ctx context.Context, db DBTX, email string) (bool, error)
 	FindUserByEmail(ctx context.Context, db DBTX, email string) (FindUserByEmailRow, error)
 	FindUserByIdentifier(ctx context.Context, db DBTX, email string) (FindUserByIdentifierRow, error)
@@ -55,6 +64,8 @@ type Querier interface {
 	GetCouponByCode(ctx context.Context, db DBTX, code string) (GetCouponByCodeRow, error)
 	GetCouponByCodeForUpdate(ctx context.Context, db DBTX, code string) (GetCouponByCodeForUpdateRow, error)
 	GetCouponByPublicID(ctx context.Context, db DBTX, publicID string) (GetCouponByPublicIDRow, error)
+	GetFeatureCodesByPublicID(ctx context.Context, db DBTX, publicID string) ([]string, error)
+	GetFeatureCodesByPublicIDExcludingRole(ctx context.Context, db DBTX, arg GetFeatureCodesByPublicIDExcludingRoleParams) ([]string, error)
 	GetGenreByPublicID(ctx context.Context, db DBTX, publicID string) (GetGenreByPublicIDRow, error)
 	GetOrCreateCart(ctx context.Context, db DBTX, userPublicID string) (int64, error)
 	// ============================================================
@@ -69,14 +80,23 @@ type Querier interface {
 	GetProductGenreIDs(ctx context.Context, db DBTX, productID int64) ([]string, error)
 	GetProductTagIDs(ctx context.Context, db DBTX, productID int64) ([]string, error)
 	GetPublisherByPublicID(ctx context.Context, db DBTX, publicID string) (GetPublisherByPublicIDRow, error)
+	GetRoleByPublicID(ctx context.Context, db DBTX, publicID string) (GetRoleByPublicIDRow, error)
+	GetRoleNamesByPublicID(ctx context.Context, db DBTX, publicID string) ([]string, error)
 	GetRoleNamesByUserID(ctx context.Context, db DBTX, userID int64) ([]string, error)
 	GetTagByPublicID(ctx context.Context, db DBTX, publicID string) (GetTagByPublicIDRow, error)
+	GetUserByPublicID(ctx context.Context, db DBTX, publicID string) (GetUserByPublicIDRow, error)
 	GetUserIDByPublicID(ctx context.Context, db DBTX, publicID string) (int64, error)
 	IncrementCouponUsed(ctx context.Context, db DBTX, id int64) (int64, error)
 	InsertCouponUsage(ctx context.Context, db DBTX, arg InsertCouponUsageParams) error
+	InsertRoleFeature(ctx context.Context, db DBTX, arg InsertRoleFeatureParams) (int64, error)
+	InsertUserRole(ctx context.Context, db DBTX, arg InsertUserRoleParams) (int64, error)
 	ListAuthors(ctx context.Context, db DBTX, arg ListAuthorsParams) ([]ListAuthorsRow, error)
 	ListCouponUsages(ctx context.Context, db DBTX, arg ListCouponUsagesParams) ([]ListCouponUsagesRow, error)
 	ListCoupons(ctx context.Context, db DBTX, arg ListCouponsParams) ([]ListCouponsRow, error)
+	// ============================================================
+	// Features
+	// ============================================================
+	ListFeatures(ctx context.Context, db DBTX) ([]ListFeaturesRow, error)
 	ListGenres(ctx context.Context, db DBTX, arg ListGenresParams) ([]ListGenresRow, error)
 	ListOrderItems(ctx context.Context, db DBTX, orderID int64) ([]ListOrderItemsRow, error)
 	ListOrders(ctx context.Context, db DBTX, arg ListOrdersParams) ([]ListOrdersRow, error)
@@ -86,11 +106,25 @@ type Querier interface {
 	ListOrdersForUser(ctx context.Context, db DBTX, arg ListOrdersForUserParams) ([]ListOrdersForUserRow, error)
 	ListProducts(ctx context.Context, db DBTX, arg ListProductsParams) ([]ListProductsRow, error)
 	ListPublishers(ctx context.Context, db DBTX, arg ListPublishersParams) ([]ListPublishersRow, error)
+	// ============================================================
+	// Roles
+	// ============================================================
+	ListRoles(ctx context.Context, db DBTX) ([]ListRolesRow, error)
 	ListTags(ctx context.Context, db DBTX, arg ListTagsParams) ([]ListTagsRow, error)
+	// ============================================================
+	// Users and their roles
+	// ============================================================
+	ListUsers(ctx context.Context, db DBTX, arg ListUsersParams) ([]ListUsersRow, error)
 	// ============================================================
 	// Orders
 	// ============================================================
 	LockCartForCheckout(ctx context.Context, db DBTX, userPublicID string) ([]LockCartForCheckoutRow, error)
+	OrderStats(ctx context.Context, db DBTX) (OrderStatsRow, error)
+	OrderStatusCounts(ctx context.Context, db DBTX) ([]OrderStatusCountsRow, error)
+	// ============================================================
+	// Dashboard stats
+	// ============================================================
+	ProductStats(ctx context.Context, db DBTX, lowStock int32) (ProductStatsRow, error)
 	RemoveFromCart(ctx context.Context, db DBTX, arg RemoveFromCartParams) (RemoveFromCartRow, error)
 	RestoreProductStock(ctx context.Context, db DBTX, arg RestoreProductStockParams) error
 	SoftDeleteAuthor(ctx context.Context, db DBTX, publicID string) (int64, error)
@@ -98,6 +132,7 @@ type Querier interface {
 	SoftDeleteGenre(ctx context.Context, db DBTX, publicID string) (int64, error)
 	SoftDeleteProduct(ctx context.Context, db DBTX, publicID string) (int64, error)
 	SoftDeletePublisher(ctx context.Context, db DBTX, publicID string) (int64, error)
+	SoftDeleteRole(ctx context.Context, db DBTX, publicID string) (int64, error)
 	SoftDeleteTag(ctx context.Context, db DBTX, publicID string) (int64, error)
 	UpdateAuthor(ctx context.Context, db DBTX, arg UpdateAuthorParams) (UpdateAuthorRow, error)
 	UpdateCoupon(ctx context.Context, db DBTX, arg UpdateCouponParams) (UpdateCouponRow, error)
@@ -109,9 +144,12 @@ type Querier interface {
 	UpdateOrderStatus(ctx context.Context, db DBTX, arg UpdateOrderStatusParams) (int64, error)
 	UpdateProduct(ctx context.Context, db DBTX, arg UpdateProductParams) (UpdateProductRow, error)
 	UpdatePublisher(ctx context.Context, db DBTX, arg UpdatePublisherParams) (UpdatePublisherRow, error)
+	UpdateRole(ctx context.Context, db DBTX, arg UpdateRoleParams) (UpdateRoleRow, error)
 	UpdateTag(ctx context.Context, db DBTX, arg UpdateTagParams) (UpdateTagRow, error)
 	UpdateUserPassword(ctx context.Context, db DBTX, arg UpdateUserPasswordParams) error
 	UserHasFeature(ctx context.Context, db DBTX, arg UserHasFeatureParams) (bool, error)
+	UserHasRole(ctx context.Context, db DBTX, arg UserHasRoleParams) (bool, error)
+	UserStats(ctx context.Context, db DBTX) (int64, error)
 	UsernameExists(ctx context.Context, db DBTX, username string) (bool, error)
 	VerifyUser(ctx context.Context, db DBTX, publicID string) (VerifyUserRow, error)
 }

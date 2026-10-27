@@ -7,7 +7,588 @@ package sqlc
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const CountFeaturesByPublicIDs = `-- name: CountFeaturesByPublicIDs :one
+SELECT count(*)
+FROM features
+WHERE is_delete = false
+  AND public_id::text = ANY($1::text[])
+`
+
+func (q *Queries) CountFeaturesByPublicIDs(ctx context.Context, db DBTX, publicIds []string) (int64, error) {
+	row := db.QueryRow(ctx, CountFeaturesByPublicIDs, publicIds)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const CountRolesByPublicIDs = `-- name: CountRolesByPublicIDs :one
+SELECT count(*)
+FROM roles
+WHERE is_delete = false
+  AND public_id::text = ANY($1::text[])
+`
+
+func (q *Queries) CountRolesByPublicIDs(ctx context.Context, db DBTX, publicIds []string) (int64, error) {
+	row := db.QueryRow(ctx, CountRolesByPublicIDs, publicIds)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const CountUsers = `-- name: CountUsers :one
+SELECT count(*)
+FROM users u
+WHERE u.is_delete = false
+  AND ($1::text IS NULL
+       OR u.username ILIKE '%' || $1::text || '%'
+       OR u.email ILIKE '%' || $1::text || '%'
+       OR u.display_name ILIKE '%' || $1::text || '%')
+`
+
+func (q *Queries) CountUsers(ctx context.Context, db DBTX, search pgtype.Text) (int64, error) {
+	row := db.QueryRow(ctx, CountUsers, search)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const CreateRole = `-- name: CreateRole :one
+INSERT INTO roles (name, description)
+VALUES ($1, $2)
+RETURNING id, public_id::text AS public_id, name, description, create_time, update_time
+`
+
+type CreateRoleParams struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+type CreateRoleRow struct {
+	ID          int64              `json:"id"`
+	PublicID    string             `json:"public_id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	CreateTime  pgtype.Timestamptz `json:"create_time"`
+	UpdateTime  pgtype.Timestamptz `json:"update_time"`
+}
+
+func (q *Queries) CreateRole(ctx context.Context, db DBTX, arg CreateRoleParams) (CreateRoleRow, error) {
+	row := db.QueryRow(ctx, CreateRole, arg.Name, arg.Description)
+	var i CreateRoleRow
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.Name,
+		&i.Description,
+		&i.CreateTime,
+		&i.UpdateTime,
+	)
+	return i, err
+}
+
+const DeleteRoleFeatures = `-- name: DeleteRoleFeatures :exec
+DELETE FROM role_features WHERE role_id = $1
+`
+
+func (q *Queries) DeleteRoleFeatures(ctx context.Context, db DBTX, roleID int64) error {
+	_, err := db.Exec(ctx, DeleteRoleFeatures, roleID)
+	return err
+}
+
+const DeleteUserRoles = `-- name: DeleteUserRoles :exec
+DELETE FROM user_roles WHERE user_id = $1
+`
+
+func (q *Queries) DeleteUserRoles(ctx context.Context, db DBTX, userID int64) error {
+	_, err := db.Exec(ctx, DeleteUserRoles, userID)
+	return err
+}
+
+const GetFeatureCodesByPublicID = `-- name: GetFeatureCodesByPublicID :many
+SELECT DISTINCT f.code
+FROM users u
+JOIN user_roles ur ON ur.user_id = u.id
+JOIN roles r ON r.id = ur.role_id AND r.is_delete = false
+JOIN role_features rf ON rf.role_id = r.id
+JOIN features f ON f.id = rf.feature_id AND f.is_delete = false
+WHERE u.public_id::text = $1::text
+  AND u.is_delete = false
+ORDER BY f.code
+`
+
+func (q *Queries) GetFeatureCodesByPublicID(ctx context.Context, db DBTX, publicID string) ([]string, error) {
+	rows, err := db.Query(ctx, GetFeatureCodesByPublicID, publicID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var code string
+		if err := rows.Scan(&code); err != nil {
+			return nil, err
+		}
+		items = append(items, code)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const GetFeatureCodesByPublicIDExcludingRole = `-- name: GetFeatureCodesByPublicIDExcludingRole :many
+SELECT DISTINCT f.code
+FROM users u
+JOIN user_roles ur ON ur.user_id = u.id
+JOIN roles r ON r.id = ur.role_id AND r.is_delete = false
+JOIN role_features rf ON rf.role_id = r.id
+JOIN features f ON f.id = rf.feature_id AND f.is_delete = false
+WHERE u.public_id::text = $1::text
+  AND u.is_delete = false
+  AND r.id <> $2
+ORDER BY f.code
+`
+
+type GetFeatureCodesByPublicIDExcludingRoleParams struct {
+	PublicID string `json:"public_id"`
+	RoleID   int64  `json:"role_id"`
+}
+
+func (q *Queries) GetFeatureCodesByPublicIDExcludingRole(ctx context.Context, db DBTX, arg GetFeatureCodesByPublicIDExcludingRoleParams) ([]string, error) {
+	rows, err := db.Query(ctx, GetFeatureCodesByPublicIDExcludingRole, arg.PublicID, arg.RoleID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var code string
+		if err := rows.Scan(&code); err != nil {
+			return nil, err
+		}
+		items = append(items, code)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const GetRoleByPublicID = `-- name: GetRoleByPublicID :one
+SELECT r.id,
+       r.public_id::text AS public_id,
+       r.name,
+       r.description,
+       r.create_time,
+       r.update_time,
+       COALESCE(
+           (SELECT array_agg(f.code ORDER BY f.code)
+            FROM role_features rf
+            JOIN features f ON f.id = rf.feature_id AND f.is_delete = false
+            WHERE rf.role_id = r.id),
+           ARRAY[]::text[]
+       )::text[] AS features,
+       (SELECT count(*) FROM user_roles ur WHERE ur.role_id = r.id)::bigint AS member_count
+FROM roles r
+WHERE r.public_id::text = $1::text
+  AND r.is_delete = false
+`
+
+type GetRoleByPublicIDRow struct {
+	ID          int64              `json:"id"`
+	PublicID    string             `json:"public_id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	CreateTime  pgtype.Timestamptz `json:"create_time"`
+	UpdateTime  pgtype.Timestamptz `json:"update_time"`
+	Features    []string           `json:"features"`
+	MemberCount int64              `json:"member_count"`
+}
+
+func (q *Queries) GetRoleByPublicID(ctx context.Context, db DBTX, publicID string) (GetRoleByPublicIDRow, error) {
+	row := db.QueryRow(ctx, GetRoleByPublicID, publicID)
+	var i GetRoleByPublicIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.Name,
+		&i.Description,
+		&i.CreateTime,
+		&i.UpdateTime,
+		&i.Features,
+		&i.MemberCount,
+	)
+	return i, err
+}
+
+const GetRoleNamesByPublicID = `-- name: GetRoleNamesByPublicID :many
+SELECT r.name
+FROM roles r
+JOIN user_roles ur ON ur.role_id = r.id
+JOIN users u ON u.id = ur.user_id
+WHERE u.public_id::text = $1::text
+  AND u.is_delete = false
+  AND r.is_delete = false
+ORDER BY r.name
+`
+
+func (q *Queries) GetRoleNamesByPublicID(ctx context.Context, db DBTX, publicID string) ([]string, error) {
+	rows, err := db.Query(ctx, GetRoleNamesByPublicID, publicID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		items = append(items, name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const GetUserByPublicID = `-- name: GetUserByPublicID :one
+SELECT u.id,
+       u.public_id::text AS public_id,
+       u.username,
+       u.display_name,
+       u.email,
+       u.phone,
+       u.is_verified,
+       u.create_time,
+       COALESCE(
+           (SELECT array_agg(r.name ORDER BY r.name)
+            FROM user_roles ur
+            JOIN roles r ON r.id = ur.role_id AND r.is_delete = false
+            WHERE ur.user_id = u.id),
+           ARRAY[]::text[]
+       )::text[] AS roles
+FROM users u
+WHERE u.public_id::text = $1::text
+  AND u.is_delete = false
+`
+
+type GetUserByPublicIDRow struct {
+	ID          int64              `json:"id"`
+	PublicID    string             `json:"public_id"`
+	Username    string             `json:"username"`
+	DisplayName string             `json:"display_name"`
+	Email       string             `json:"email"`
+	Phone       pgtype.Text        `json:"phone"`
+	IsVerified  bool               `json:"is_verified"`
+	CreateTime  pgtype.Timestamptz `json:"create_time"`
+	Roles       []string           `json:"roles"`
+}
+
+func (q *Queries) GetUserByPublicID(ctx context.Context, db DBTX, publicID string) (GetUserByPublicIDRow, error) {
+	row := db.QueryRow(ctx, GetUserByPublicID, publicID)
+	var i GetUserByPublicIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.Username,
+		&i.DisplayName,
+		&i.Email,
+		&i.Phone,
+		&i.IsVerified,
+		&i.CreateTime,
+		&i.Roles,
+	)
+	return i, err
+}
+
+const InsertRoleFeature = `-- name: InsertRoleFeature :execrows
+INSERT INTO role_features (role_id, feature_id)
+SELECT $1, id
+FROM features
+WHERE public_id::text = $2::text
+  AND is_delete = false
+ON CONFLICT DO NOTHING
+`
+
+type InsertRoleFeatureParams struct {
+	RoleID          int64  `json:"role_id"`
+	FeaturePublicID string `json:"feature_public_id"`
+}
+
+func (q *Queries) InsertRoleFeature(ctx context.Context, db DBTX, arg InsertRoleFeatureParams) (int64, error) {
+	result, err := db.Exec(ctx, InsertRoleFeature, arg.RoleID, arg.FeaturePublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const InsertUserRole = `-- name: InsertUserRole :execrows
+INSERT INTO user_roles (user_id, role_id)
+SELECT $1, id
+FROM roles
+WHERE public_id::text = $2::text
+  AND is_delete = false
+ON CONFLICT DO NOTHING
+`
+
+type InsertUserRoleParams struct {
+	UserID       int64  `json:"user_id"`
+	RolePublicID string `json:"role_public_id"`
+}
+
+func (q *Queries) InsertUserRole(ctx context.Context, db DBTX, arg InsertUserRoleParams) (int64, error) {
+	result, err := db.Exec(ctx, InsertUserRole, arg.UserID, arg.RolePublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const ListFeatures = `-- name: ListFeatures :many
+
+SELECT id, public_id::text AS public_id, code, name, description
+FROM features
+WHERE is_delete = false
+ORDER BY code
+`
+
+type ListFeaturesRow struct {
+	ID          int64  `json:"id"`
+	PublicID    string `json:"public_id"`
+	Code        string `json:"code"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// ============================================================
+// Features
+// ============================================================
+func (q *Queries) ListFeatures(ctx context.Context, db DBTX) ([]ListFeaturesRow, error) {
+	rows, err := db.Query(ctx, ListFeatures)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListFeaturesRow{}
+	for rows.Next() {
+		var i ListFeaturesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.Code,
+			&i.Name,
+			&i.Description,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const ListRoles = `-- name: ListRoles :many
+
+SELECT r.id,
+       r.public_id::text AS public_id,
+       r.name,
+       r.description,
+       r.create_time,
+       r.update_time,
+       COALESCE(
+           (SELECT array_agg(f.code ORDER BY f.code)
+            FROM role_features rf
+            JOIN features f ON f.id = rf.feature_id AND f.is_delete = false
+            WHERE rf.role_id = r.id),
+           ARRAY[]::text[]
+       )::text[] AS features,
+       (SELECT count(*) FROM user_roles ur WHERE ur.role_id = r.id)::bigint AS member_count
+FROM roles r
+WHERE r.is_delete = false
+ORDER BY r.name
+`
+
+type ListRolesRow struct {
+	ID          int64              `json:"id"`
+	PublicID    string             `json:"public_id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	CreateTime  pgtype.Timestamptz `json:"create_time"`
+	UpdateTime  pgtype.Timestamptz `json:"update_time"`
+	Features    []string           `json:"features"`
+	MemberCount int64              `json:"member_count"`
+}
+
+// ============================================================
+// Roles
+// ============================================================
+func (q *Queries) ListRoles(ctx context.Context, db DBTX) ([]ListRolesRow, error) {
+	rows, err := db.Query(ctx, ListRoles)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRolesRow{}
+	for rows.Next() {
+		var i ListRolesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.Name,
+			&i.Description,
+			&i.CreateTime,
+			&i.UpdateTime,
+			&i.Features,
+			&i.MemberCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const ListUsers = `-- name: ListUsers :many
+
+SELECT u.id,
+       u.public_id::text AS public_id,
+       u.username,
+       u.display_name,
+       u.email,
+       u.phone,
+       u.is_verified,
+       u.create_time,
+       COALESCE(
+           (SELECT array_agg(r.name ORDER BY r.name)
+            FROM user_roles ur
+            JOIN roles r ON r.id = ur.role_id AND r.is_delete = false
+            WHERE ur.user_id = u.id),
+           ARRAY[]::text[]
+       )::text[] AS roles
+FROM users u
+WHERE u.is_delete = false
+  AND ($1::text IS NULL
+       OR u.username ILIKE '%' || $1::text || '%'
+       OR u.email ILIKE '%' || $1::text || '%'
+       OR u.display_name ILIKE '%' || $1::text || '%')
+ORDER BY u.create_time DESC
+LIMIT $3 OFFSET $2
+`
+
+type ListUsersParams struct {
+	Search     pgtype.Text `json:"search"`
+	PageOffset int32       `json:"page_offset"`
+	PageLimit  int32       `json:"page_limit"`
+}
+
+type ListUsersRow struct {
+	ID          int64              `json:"id"`
+	PublicID    string             `json:"public_id"`
+	Username    string             `json:"username"`
+	DisplayName string             `json:"display_name"`
+	Email       string             `json:"email"`
+	Phone       pgtype.Text        `json:"phone"`
+	IsVerified  bool               `json:"is_verified"`
+	CreateTime  pgtype.Timestamptz `json:"create_time"`
+	Roles       []string           `json:"roles"`
+}
+
+// ============================================================
+// Users and their roles
+// ============================================================
+func (q *Queries) ListUsers(ctx context.Context, db DBTX, arg ListUsersParams) ([]ListUsersRow, error) {
+	rows, err := db.Query(ctx, ListUsers, arg.Search, arg.PageOffset, arg.PageLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUsersRow{}
+	for rows.Next() {
+		var i ListUsersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.Username,
+			&i.DisplayName,
+			&i.Email,
+			&i.Phone,
+			&i.IsVerified,
+			&i.CreateTime,
+			&i.Roles,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const SoftDeleteRole = `-- name: SoftDeleteRole :execrows
+UPDATE roles
+SET is_delete = true, delete_at = now()
+WHERE public_id::text = $1::text
+  AND is_delete = false
+`
+
+func (q *Queries) SoftDeleteRole(ctx context.Context, db DBTX, publicID string) (int64, error) {
+	result, err := db.Exec(ctx, SoftDeleteRole, publicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const UpdateRole = `-- name: UpdateRole :one
+UPDATE roles
+SET name        = $1,
+    description = $2
+WHERE public_id::text = $3::text
+  AND is_delete = false
+RETURNING id, public_id::text AS public_id, name, description, create_time, update_time
+`
+
+type UpdateRoleParams struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	PublicID    string `json:"public_id"`
+}
+
+type UpdateRoleRow struct {
+	ID          int64              `json:"id"`
+	PublicID    string             `json:"public_id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	CreateTime  pgtype.Timestamptz `json:"create_time"`
+	UpdateTime  pgtype.Timestamptz `json:"update_time"`
+}
+
+func (q *Queries) UpdateRole(ctx context.Context, db DBTX, arg UpdateRoleParams) (UpdateRoleRow, error) {
+	row := db.QueryRow(ctx, UpdateRole, arg.Name, arg.Description, arg.PublicID)
+	var i UpdateRoleRow
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.Name,
+		&i.Description,
+		&i.CreateTime,
+		&i.UpdateTime,
+	)
+	return i, err
+}
 
 const UserHasFeature = `-- name: UserHasFeature :one
 SELECT EXISTS (
@@ -33,4 +614,28 @@ func (q *Queries) UserHasFeature(ctx context.Context, db DBTX, arg UserHasFeatur
 	var has_feature bool
 	err := row.Scan(&has_feature)
 	return has_feature, err
+}
+
+const UserHasRole = `-- name: UserHasRole :one
+SELECT EXISTS (
+    SELECT 1
+    FROM users u
+    JOIN user_roles ur ON ur.user_id = u.id
+    JOIN roles r ON r.id = ur.role_id AND r.is_delete = false
+    WHERE u.public_id::text = $1::text
+      AND u.is_delete = false
+      AND r.public_id::text = $2::text
+) AS has_role
+`
+
+type UserHasRoleParams struct {
+	UserPublicID string `json:"user_public_id"`
+	RolePublicID string `json:"role_public_id"`
+}
+
+func (q *Queries) UserHasRole(ctx context.Context, db DBTX, arg UserHasRoleParams) (bool, error) {
+	row := db.QueryRow(ctx, UserHasRole, arg.UserPublicID, arg.RolePublicID)
+	var has_role bool
+	err := row.Scan(&has_role)
+	return has_role, err
 }

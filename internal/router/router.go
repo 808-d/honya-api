@@ -10,10 +10,12 @@ import (
 	"github.com/808-d/honya-api/internal/modules/author"
 	"github.com/808-d/honya-api/internal/modules/cart"
 	"github.com/808-d/honya-api/internal/modules/coupon"
+	"github.com/808-d/honya-api/internal/modules/dashboard"
 	"github.com/808-d/honya-api/internal/modules/genre"
 	"github.com/808-d/honya-api/internal/modules/order"
 	"github.com/808-d/honya-api/internal/modules/product"
 	"github.com/808-d/honya-api/internal/modules/publisher"
+	"github.com/808-d/honya-api/internal/modules/rbac"
 	"github.com/808-d/honya-api/internal/modules/tag"
 	"github.com/808-d/honya-api/pkg/jwt"
 	"github.com/808-d/honya-api/pkg/mailer"
@@ -73,11 +75,14 @@ func New(db *pgxpool.Pool, rdb *redis.Client, cfg *config.Config) http.Handler {
 		couponService,
 		cfg.ShippingFeePercent,
 	))
+	rbacHandler := rbac.NewHandler(rbac.NewService(rbac.NewRepository(db)))
+	dashboardHandler := dashboard.NewHandler(dashboard.NewService(dashboard.NewRepository(db), rdb))
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Route("/auth", func(r chi.Router) {
 			authHandler.RegisterRoutes(r)
 		})
+		r.With(appmw.Auth(tokenManager)).Get("/auth/permissions", authHandler.Permissions)
 		productHandler.RegisterRoutes(r)
 		authorHandler.RegisterRoutes(r)
 		genreHandler.RegisterRoutes(r)
@@ -94,6 +99,19 @@ func New(db *pgxpool.Pool, rdb *redis.Client, cfg *config.Config) http.Handler {
 			appmw.Auth(tokenManager),
 			appmw.RequireFeature(db, "order.read"),
 			appmw.RequireFeature(db, "order.write"),
+		)
+		rbacHandler.RegisterRoutes(
+			r,
+			appmw.Auth(tokenManager),
+			appmw.RequireFeature(db, "role.read"),
+			appmw.RequireFeature(db, "role.write"),
+			appmw.RequireFeature(db, "user.read"),
+			appmw.RequireFeature(db, "user.write"),
+		)
+		dashboardHandler.RegisterRoutes(
+			r,
+			appmw.Auth(tokenManager),
+			appmw.RequireFeature(db, "dashboard.access"),
 		)
 
 		r.Group(func(r chi.Router) {
