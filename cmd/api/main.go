@@ -41,7 +41,11 @@ func main() {
 		Password: cfg.RedisPassword,
 		DB:       cfg.RedisDB,
 	})
-	defer rdb.Close()
+	defer func() {
+		if err := rdb.Close(); err != nil {
+			log.Printf("close redis: %v", err)
+		}
+	}()
 
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		log.Fatalf("ping redis: %v", err)

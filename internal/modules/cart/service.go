@@ -5,7 +5,9 @@ import (
 	"errors"
 	"time"
 
+	"github.com/808-d/honya-api/internal/database/sqlc"
 	"github.com/808-d/honya-api/internal/shared/apperror"
+	"github.com/808-d/honya-api/internal/shared/audit"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -19,7 +21,7 @@ func NewService(repo *Repository) *Service {
 
 // List returns the authenticated user's cart.
 func (s *Service) List(ctx context.Context, userPublicID string) *CartResponse {
-	cartID := s.cartID(ctx, userPublicID)
+	cartID := s.cartID(ctx, s.repo.db, userPublicID)
 
 	items, err := s.repo.ListItems(ctx, cartID)
 	if err != nil {
@@ -53,9 +55,18 @@ func (s *Service) AddItem(ctx context.Context, userPublicID string, in AddItemRe
 		panic(err)
 	}
 
-	cartID := s.cartID(ctx, userPublicID)
-	item, err := s.repo.AddItem(ctx, cartID, productID, in.Quantity)
+	tx, err := audit.Begin(ctx, s.repo.db)
 	if err != nil {
+		panic(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	cartID := s.cartID(ctx, tx, userPublicID)
+	item, err := s.repo.AddItem(ctx, tx, cartID, productID, in.Quantity)
+	if err != nil {
+		panic(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
 		panic(err)
 	}
 
@@ -68,13 +79,22 @@ func (s *Service) AddItem(ctx context.Context, userPublicID string, in AddItemRe
 
 // RemoveItem deletes a line from the authenticated user's cart.
 func (s *Service) RemoveItem(ctx context.Context, userPublicID string, id int64) *CartMutationResponse {
-	cartID := s.cartID(ctx, userPublicID)
+	tx, err := audit.Begin(ctx, s.repo.db)
+	if err != nil {
+		panic(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
 
-	item, err := s.repo.RemoveItem(ctx, id, cartID)
+	cartID := s.cartID(ctx, tx, userPublicID)
+
+	item, err := s.repo.RemoveItem(ctx, tx, id, cartID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			panic(apperror.NotFound("cart item not found"))
 		}
+		panic(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
 		panic(err)
 	}
 
@@ -85,8 +105,8 @@ func (s *Service) RemoveItem(ctx context.Context, userPublicID string, id int64)
 	return &CartMutationResponse{Item: toResponse(item), CartCount: count}
 }
 
-func (s *Service) cartID(ctx context.Context, userPublicID string) int64 {
-	cartID, err := s.repo.CartIDByUserPublicID(ctx, userPublicID)
+func (s *Service) cartID(ctx context.Context, db sqlc.DBTX, userPublicID string) int64 {
+	cartID, err := s.repo.CartIDByUserPublicID(ctx, db, userPublicID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			panic(apperror.Unauthorized("user not found"))

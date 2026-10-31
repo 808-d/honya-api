@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/808-d/honya-api/internal/database/sqlc"
+	"github.com/808-d/honya-api/internal/shared/audit"
 	"github.com/808-d/honya-api/internal/shared/utils"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -21,7 +22,7 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 
 // Begin starts a transaction owned by the service.
 func (r *Repository) Begin(ctx context.Context) (pgx.Tx, error) {
-	return r.db.Begin(ctx)
+	return audit.Begin(ctx, r.db)
 }
 
 func (r *Repository) ListRoles(ctx context.Context) ([]Role, error) {

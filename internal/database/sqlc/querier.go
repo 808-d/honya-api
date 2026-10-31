@@ -85,6 +85,7 @@ type Querier interface {
 	GetRoleNamesByUserID(ctx context.Context, db DBTX, userID int64) ([]string, error)
 	GetTagByPublicID(ctx context.Context, db DBTX, publicID string) (GetTagByPublicIDRow, error)
 	GetUserByPublicID(ctx context.Context, db DBTX, publicID string) (GetUserByPublicIDRow, error)
+	GetUserContactByPublicID(ctx context.Context, db DBTX, publicID string) (GetUserContactByPublicIDRow, error)
 	GetUserIDByPublicID(ctx context.Context, db DBTX, publicID string) (int64, error)
 	IncrementCouponUsed(ctx context.Context, db DBTX, id int64) (int64, error)
 	InsertCouponUsage(ctx context.Context, db DBTX, arg InsertCouponUsageParams) error

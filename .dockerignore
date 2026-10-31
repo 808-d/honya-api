@@ -1,0 +1,38 @@
+# Version control
+.git
+.gitignore
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Container files
+Dockerfile
+.dockerignore
+docker-compose*.yml
+docker-compose*.yaml
+
+# Local tooling and editor files
+.github
+.idea
+.vscode
+
+# Build and test artifacts
+bin/
+dist/
+tmp/
+*.out
+*.test
+*.prof
+coverage.*
+profile.cov
+
+# Local data and documentation
+storage/
+docs/
+test/
+README.md
+
+# SQL tooling (not needed to compile the API)
+sqlc.yaml

@@ -49,19 +49,21 @@ func New(db *pgxpool.Pool, rdb *redis.Client, cfg *config.Config) http.Handler {
 		time.Duration(cfg.JWTAccessTTLMin)*time.Minute,
 	)
 	codes := verification.NewStore(rdb, time.Duration(cfg.VerificationTTLMin)*time.Minute)
+	transactionalMail := mailer.New(cfg.SMTPEmail, cfg.AppPassword)
 
 	authHandler := auth.NewHandler(
 		auth.NewService(
 			auth.NewRepository(db),
 			tokenManager,
 			codes,
-			mailer.New(cfg.SMTPEmail, cfg.AppPassword),
+			transactionalMail,
 			cfg.AppBaseURL,
 			cfg.WebBaseURL,
 		),
 		cfg.AppEnv == "production",
 	)
 
+	catalogWrite := appmw.RequireFeature(db, "catalog.write")
 	productHandler := product.NewHandler(product.NewService(product.NewRepository(db)))
 	authorHandler := author.NewHandler(author.NewService(author.NewRepository(db)))
 	genreHandler := genre.NewHandler(genre.NewService(genre.NewRepository(db)))
@@ -74,6 +76,8 @@ func New(db *pgxpool.Pool, rdb *redis.Client, cfg *config.Config) http.Handler {
 		order.NewRepository(db),
 		couponService,
 		cfg.ShippingFeePercent,
+		transactionalMail,
+		cfg.WebBaseURL,
 	))
 	rbacHandler := rbac.NewHandler(rbac.NewService(rbac.NewRepository(db)))
 	dashboardHandler := dashboard.NewHandler(dashboard.NewService(dashboard.NewRepository(db), rdb))
@@ -83,11 +87,12 @@ func New(db *pgxpool.Pool, rdb *redis.Client, cfg *config.Config) http.Handler {
 			authHandler.RegisterRoutes(r)
 		})
 		r.With(appmw.Auth(tokenManager)).Get("/auth/permissions", authHandler.Permissions)
-		productHandler.RegisterRoutes(r)
-		authorHandler.RegisterRoutes(r)
-		genreHandler.RegisterRoutes(r)
-		publisherHandler.RegisterRoutes(r)
-		tagHandler.RegisterRoutes(r)
+		authMiddleware := appmw.Auth(tokenManager)
+		productHandler.RegisterRoutes(r, authMiddleware, catalogWrite)
+		authorHandler.RegisterRoutes(r, authMiddleware, catalogWrite)
+		genreHandler.RegisterRoutes(r, authMiddleware, catalogWrite)
+		publisherHandler.RegisterRoutes(r, authMiddleware, catalogWrite)
+		tagHandler.RegisterRoutes(r, authMiddleware, catalogWrite)
 		couponHandler.RegisterRoutes(
 			r,
 			appmw.Auth(tokenManager),

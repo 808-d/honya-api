@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/808-d/honya-api/internal/database/sqlc"
+	"github.com/808-d/honya-api/internal/shared/audit"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -54,7 +55,13 @@ func (r *Repository) Get(ctx context.Context, publicID string) (*Publisher, erro
 }
 
 func (r *Repository) Create(ctx context.Context, name string) (*Publisher, error) {
-	row, err := r.q.CreatePublisher(ctx, r.db, name)
+	tx, err := audit.Begin(ctx, r.db)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	row, err := r.q.CreatePublisher(ctx, tx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -64,12 +71,21 @@ func (r *Repository) Create(ctx context.Context, name string) (*Publisher, error
 		Name:       row.Name,
 		CreateTime: row.CreateTime.Time,
 		UpdateTime: row.UpdateTime.Time,
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
 	}
 	return &g, nil
 }
 
 func (r *Repository) Update(ctx context.Context, publicID, name string) (*Publisher, error) {
-	row, err := r.q.UpdatePublisher(ctx, r.db, sqlc.UpdatePublisherParams{Name: name, PublicID: publicID})
+	tx, err := audit.Begin(ctx, r.db)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	row, err := r.q.UpdatePublisher(ctx, tx, sqlc.UpdatePublisherParams{Name: name, PublicID: publicID})
 	if err != nil {
 		return nil, err
 	}
@@ -80,9 +96,25 @@ func (r *Repository) Update(ctx context.Context, publicID, name string) (*Publis
 		CreateTime: row.CreateTime.Time,
 		UpdateTime: row.UpdateTime.Time,
 	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
 	return &g, nil
 }
 
 func (r *Repository) SoftDelete(ctx context.Context, publicID string) (int64, error) {
-	return r.q.SoftDeletePublisher(ctx, r.db, publicID)
+	tx, err := audit.Begin(ctx, r.db)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	affected, err := r.q.SoftDeletePublisher(ctx, tx, publicID)
+	if err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return 0, err
+	}
+	return affected, nil
 }

@@ -18,8 +18,8 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 }
 
 // CartIDByUserPublicID returns the user's cart id, creating the cart on first use.
-func (r *Repository) CartIDByUserPublicID(ctx context.Context, userPublicID string) (int64, error) {
-	return r.q.GetOrCreateCart(ctx, r.db, userPublicID)
+func (r *Repository) CartIDByUserPublicID(ctx context.Context, db sqlc.DBTX, userPublicID string) (int64, error) {
+	return r.q.GetOrCreateCart(ctx, db, userPublicID)
 }
 
 // ProductIDByPublicID resolves a product's internal id from its public id.
@@ -50,8 +50,8 @@ func (r *Repository) Count(ctx context.Context, cartID int64) (int64, error) {
 }
 
 // AddItem inserts a line or increments its quantity when it already exists.
-func (r *Repository) AddItem(ctx context.Context, cartID, productID int64, quantity int32) (*CartItem, error) {
-	row, err := r.q.AddToCart(ctx, r.db, sqlc.AddToCartParams{
+func (r *Repository) AddItem(ctx context.Context, db sqlc.DBTX, cartID, productID int64, quantity int32) (*CartItem, error) {
+	row, err := r.q.AddToCart(ctx, db, sqlc.AddToCartParams{
 		CartID:    cartID,
 		ProductID: productID,
 		Quantity:  quantity,
@@ -64,8 +64,8 @@ func (r *Repository) AddItem(ctx context.Context, cartID, productID int64, quant
 }
 
 // RemoveItem deletes a line from the cart and returns the removed line.
-func (r *Repository) RemoveItem(ctx context.Context, id, cartID int64) (*CartItem, error) {
-	row, err := r.q.RemoveFromCart(ctx, r.db, sqlc.RemoveFromCartParams{ID: id, CartID: cartID})
+func (r *Repository) RemoveItem(ctx context.Context, db sqlc.DBTX, id, cartID int64) (*CartItem, error) {
+	row, err := r.q.RemoveFromCart(ctx, db, sqlc.RemoveFromCartParams{ID: id, CartID: cartID})
 	if err != nil {
 		return nil, err
 	}

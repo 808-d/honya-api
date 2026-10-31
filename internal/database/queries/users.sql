@@ -60,3 +60,9 @@ JOIN user_roles ur ON ur.role_id = r.id
 WHERE ur.user_id = $1
   AND r.is_delete = false
 ORDER BY r.name;
+
+-- name: GetUserContactByPublicID :one
+SELECT username, display_name, email
+FROM users
+WHERE public_id::text = sqlc.arg(public_id)::text
+  AND is_delete = false;

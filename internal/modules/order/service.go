@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/808-d/honya-api/internal/modules/product"
 	"github.com/808-d/honya-api/internal/shared/apperror"
 	"github.com/808-d/honya-api/internal/shared/utils"
+	"github.com/808-d/honya-api/pkg/mailer"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -25,9 +27,17 @@ type Service struct {
 	repo               *Repository
 	coupons            *coupon.Service
 	shippingFeePercent float64
+	mailer             mailer.Mailer
+	webBaseURL         string
 }
 
-func NewService(repo *Repository, coupons *coupon.Service, shippingFeePercent float64) *Service {
+func NewService(
+	repo *Repository,
+	coupons *coupon.Service,
+	shippingFeePercent float64,
+	mail mailer.Mailer,
+	webBaseURL string,
+) *Service {
 	if shippingFeePercent < 0 {
 		shippingFeePercent = 0
 	}
@@ -35,6 +45,8 @@ func NewService(repo *Repository, coupons *coupon.Service, shippingFeePercent fl
 		repo:               repo,
 		coupons:            coupons,
 		shippingFeePercent: shippingFeePercent,
+		mailer:             mail,
+		webBaseURL:         strings.TrimRight(webBaseURL, "/"),
 	}
 }
 
@@ -183,7 +195,33 @@ func (s *Service) Checkout(ctx context.Context, userPublicID string, in CreateOr
 	if appliedCoupon != nil {
 		created.CouponCode = appliedCoupon.Code
 	}
+	s.sendOrderConfirmation(ctx, userPublicID, created)
 	return toResponse(created, true)
+}
+
+// sendOrderConfirmation delivers a best-effort receipt after checkout. Email
+// failures are logged and never roll back the order.
+func (s *Service) sendOrderConfirmation(ctx context.Context, userPublicID string, o *Order) {
+	if s.mailer == nil {
+		return
+	}
+
+	contact, err := s.repo.UserContactByPublicID(ctx, userPublicID)
+	if err != nil {
+		log.Printf("order email: load contact for order %s: %v", o.PublicID, err)
+		return
+	}
+	msg, err := buildOrderConfirmationEmail(contact, o, s.webBaseURL)
+	if err != nil {
+		log.Printf("order email: build email for order %s: %v", o.PublicID, err)
+		return
+	}
+
+	sendCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+	defer cancel()
+	if err := s.mailer.Send(sendCtx, msg); err != nil {
+		log.Printf("order email: send for order %s: %v", o.PublicID, err)
+	}
 }
 
 // GetForUser returns one of the caller's orders with its items.
@@ -245,7 +283,24 @@ func (s *Service) ListAdmin(ctx context.Context, filter ListFilter) *ListResult 
 	return listResult(orders, total, page, perPage)
 }
 
-// Cancel cancels one of the caller's pending, unpaid orders.
+// UpdateStatusForUser applies a customer-facing status transition after
+// verifying that the order belongs to the caller. The transition rules stay in
+// the shared UpdateStatus path.
+func (s *Service) UpdateStatusForUser(
+	ctx context.Context,
+	userPublicID, publicID string,
+	in UpdateStatusRequest,
+) *OrderResponse {
+	if _, err := s.repo.GetByPublicIDForUser(ctx, publicID, userPublicID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			panic(apperror.NotFound("order not found"))
+		}
+		panic(err)
+	}
+	return s.UpdateStatus(ctx, publicID, in)
+}
+
+// Cancel cancels one of the caller's orders before it has been dispatched.
 func (s *Service) Cancel(ctx context.Context, userPublicID, publicID string) *OrderResponse {
 	tx, err := s.repo.Begin(ctx)
 	if err != nil {
@@ -260,8 +315,8 @@ func (s *Service) Cancel(ctx context.Context, userPublicID, publicID string) *Or
 		}
 		panic(err)
 	}
-	if o.Status != OrderStatusPending || o.PaymentStatus != PaymentStatusUnpaid {
-		panic(apperror.Conflict("order can only be cancelled while pending and unpaid"))
+	if !customerCanCancel(o.Status, o.PaymentStatus) {
+		panic(apperror.Conflict("order can only be cancelled before dispatch and before payment is collected"))
 	}
 
 	s.cancel(ctx, tx, o)
@@ -301,6 +356,25 @@ func (s *Service) UpdateStatus(ctx context.Context, publicID string, in UpdateSt
 		s.cancel(ctx, tx, o)
 	case OrderStatusRefunded:
 		s.refund(ctx, tx, o)
+	case OrderStatusCompleted:
+		affected, err := s.repo.UpdateStatus(ctx, tx, o.ID, o.Status, next)
+		if err != nil {
+			panic(err)
+		}
+		if affected == 0 {
+			panic(apperror.Conflict("order status changed"))
+		}
+
+		if completionMarksPaid(o.PaymentStatus) {
+			now := time.Now()
+			affected, err = s.repo.UpdatePayment(ctx, tx, o.ID, o.PaymentStatus, PaymentStatusPaid, &now)
+			if err != nil {
+				panic(err)
+			}
+			if affected == 0 {
+				panic(apperror.Conflict("payment status changed"))
+			}
+		}
 	default:
 		affected, err := s.repo.UpdateStatus(ctx, tx, o.ID, o.Status, next)
 		if err != nil {
@@ -362,6 +436,17 @@ func (s *Service) UpdatePayment(ctx context.Context, publicID string, in UpdateP
 		panic(err)
 	}
 	return s.GetAdmin(ctx, publicID)
+}
+
+func customerCanCancel(status OrderStatus, payment PaymentStatus) bool {
+	if !status.CanTransitionTo(OrderStatusCancelled) {
+		return false
+	}
+	return payment == PaymentStatusUnpaid || payment == PaymentStatusFailed
+}
+
+func completionMarksPaid(payment PaymentStatus) bool {
+	return payment == PaymentStatusUnpaid || payment == PaymentStatusFailed
 }
 
 func (s *Service) cancel(ctx context.Context, tx pgx.Tx, o *Order) {

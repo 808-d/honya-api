@@ -20,6 +20,7 @@ func (h *Handler) RegisterRoutes(
 		r.Get("/", h.List)
 		r.Get("/{id}", h.Get)
 		r.Post("/{id}/cancel", h.Cancel)
+		r.Post("/{id}/receive", h.Receive)
 	})
 
 	r.Route("/admin/orders", func(r chi.Router) {

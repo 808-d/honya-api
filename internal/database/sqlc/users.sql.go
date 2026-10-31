@@ -180,6 +180,26 @@ func (q *Queries) GetRoleNamesByUserID(ctx context.Context, db DBTX, userID int6
 	return items, nil
 }
 
+const GetUserContactByPublicID = `-- name: GetUserContactByPublicID :one
+SELECT username, display_name, email
+FROM users
+WHERE public_id::text = $1::text
+  AND is_delete = false
+`
+
+type GetUserContactByPublicIDRow struct {
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+	Email       string `json:"email"`
+}
+
+func (q *Queries) GetUserContactByPublicID(ctx context.Context, db DBTX, publicID string) (GetUserContactByPublicIDRow, error) {
+	row := db.QueryRow(ctx, GetUserContactByPublicID, publicID)
+	var i GetUserContactByPublicIDRow
+	err := row.Scan(&i.Username, &i.DisplayName, &i.Email)
+	return i, err
+}
+
 const GetUserIDByPublicID = `-- name: GetUserIDByPublicID :one
 SELECT id
 FROM users

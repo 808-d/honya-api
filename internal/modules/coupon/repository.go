@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/808-d/honya-api/internal/database/sqlc"
+	"github.com/808-d/honya-api/internal/shared/audit"
 	"github.com/808-d/honya-api/internal/shared/utils"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -60,7 +61,13 @@ func toCoupon(r couponRow) *Coupon {
 
 // Create inserts a new coupon.
 func (r *Repository) Create(ctx context.Context, in CouponWrite) (*Coupon, error) {
-	row, err := r.q.CreateCoupon(ctx, r.db, sqlc.CreateCouponParams{
+	tx, err := audit.Begin(ctx, r.db)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	row, err := r.q.CreateCoupon(ctx, tx, sqlc.CreateCouponParams{
 		Code:           in.Code,
 		Type:           int16(in.Type),
 		Value:          in.Value,
@@ -75,12 +82,21 @@ func (r *Repository) Create(ctx context.Context, in CouponWrite) (*Coupon, error
 	if err != nil {
 		return nil, err
 	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
 	return toCoupon(couponRow(row)), nil
 }
 
 // Update replaces an existing coupon.
 func (r *Repository) Update(ctx context.Context, publicID string, in CouponWrite) (*Coupon, error) {
-	row, err := r.q.UpdateCoupon(ctx, r.db, sqlc.UpdateCouponParams{
+	tx, err := audit.Begin(ctx, r.db)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	row, err := r.q.UpdateCoupon(ctx, tx, sqlc.UpdateCouponParams{
 		Code:           in.Code,
 		Type:           int16(in.Type),
 		Value:          in.Value,
@@ -94,6 +110,9 @@ func (r *Repository) Update(ctx context.Context, publicID string, in CouponWrite
 		PublicID:       publicID,
 	})
 	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 	return toCoupon(couponRow(row)), nil
@@ -146,7 +165,20 @@ func (r *Repository) Count(ctx context.Context, params sqlc.CountCouponsParams) 
 
 // SoftDelete marks a coupon as deleted.
 func (r *Repository) SoftDelete(ctx context.Context, publicID string) (int64, error) {
-	return r.q.SoftDeleteCoupon(ctx, r.db, publicID)
+	tx, err := audit.Begin(ctx, r.db)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	affected, err := r.q.SoftDeleteCoupon(ctx, tx, publicID)
+	if err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return 0, err
+	}
+	return affected, nil
 }
 
 // UserIDByPublicID resolves a user's internal id from their public id.

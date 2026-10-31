@@ -84,8 +84,8 @@ func (r *Repository) Create(ctx context.Context, username, displayName, hashPass
 }
 
 // Verify marks the user as verified and returns the updated row.
-func (r *Repository) Verify(ctx context.Context, publicID string) (*User, error) {
-	row, err := r.q.VerifyUser(ctx, r.db, publicID)
+func (r *Repository) Verify(ctx context.Context, db sqlc.DBTX, publicID string) (*User, error) {
+	row, err := r.q.VerifyUser(ctx, db, publicID)
 	if err != nil {
 		return nil, err
 	}
@@ -101,16 +101,16 @@ func (r *Repository) Verify(ctx context.Context, publicID string) (*User, error)
 }
 
 // AssignRoleByName grants the named role to a user if the role exists.
-func (r *Repository) AssignRoleByName(ctx context.Context, userID int64, name string) error {
-	return r.q.AssignRoleByName(ctx, r.db, sqlc.AssignRoleByNameParams{
+func (r *Repository) AssignRoleByName(ctx context.Context, db sqlc.DBTX, userID int64, name string) error {
+	return r.q.AssignRoleByName(ctx, db, sqlc.AssignRoleByNameParams{
 		UserID: userID,
 		Name:   name,
 	})
 }
 
 // UpdatePassword replaces the user's password hash.
-func (r *Repository) UpdatePassword(ctx context.Context, publicID, hashPassword string) error {
-	return r.q.UpdateUserPassword(ctx, r.db, sqlc.UpdateUserPasswordParams{
+func (r *Repository) UpdatePassword(ctx context.Context, db sqlc.DBTX, publicID, hashPassword string) error {
+	return r.q.UpdateUserPassword(ctx, db, sqlc.UpdateUserPasswordParams{
 		PublicID:     publicID,
 		HashPassword: hashPassword,
 	})

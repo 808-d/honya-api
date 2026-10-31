@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/808-d/honya-api/internal/shared/apperror"
+	"github.com/808-d/honya-api/internal/shared/audit"
 	"github.com/808-d/honya-api/pkg/jwt"
 	"github.com/808-d/honya-api/pkg/mailer"
 	"github.com/808-d/honya-api/pkg/password"
@@ -141,7 +142,13 @@ func (s *Service) VerifyRegister(ctx context.Context, publicID, token string) *L
 		panic(apperror.BadRequest("invalid or expired verification token"))
 	}
 
-	user, err := s.repo.Verify(ctx, publicID)
+	tx, err := audit.BeginAs(ctx, s.repo.db, publicID)
+	if err != nil {
+		panic(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	user, err := s.repo.Verify(ctx, tx, publicID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			panic(apperror.BadRequest("user not found"))
@@ -149,7 +156,10 @@ func (s *Service) VerifyRegister(ctx context.Context, publicID, token string) *L
 		panic(err)
 	}
 
-	if err := s.repo.AssignRoleByName(ctx, user.ID, defaultRole); err != nil {
+	if err := s.repo.AssignRoleByName(ctx, tx, user.ID, defaultRole); err != nil {
+		panic(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
 		panic(err)
 	}
 
@@ -211,7 +221,17 @@ func (s *Service) ResetPassword(ctx context.Context, req ResetPasswordRequest) {
 	if err != nil {
 		panic(err)
 	}
-	if err := s.repo.UpdatePassword(ctx, req.ID, hash); err != nil {
+
+	tx, err := audit.BeginAs(ctx, s.repo.db, req.ID)
+	if err != nil {
+		panic(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if err := s.repo.UpdatePassword(ctx, tx, req.ID, hash); err != nil {
+		panic(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
 		panic(err)
 	}
 }

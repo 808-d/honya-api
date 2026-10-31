@@ -64,6 +64,18 @@ func (h *Handler) Cancel(w http.ResponseWriter, r *http.Request) {
 	response.OK(w, "order cancelled", result)
 }
 
+// Receive handles POST /orders/{id}/receive. It delegates the actual status
+// transition to the shared admin status updater after checking ownership.
+func (h *Handler) Receive(w http.ResponseWriter, r *http.Request) {
+	result := h.svc.UpdateStatusForUser(
+		r.Context(),
+		middleware.UserIDFromContext(r.Context()),
+		chi.URLParam(r, "id"),
+		UpdateStatusRequest{Status: int16(OrderStatusCompleted)},
+	)
+	response.OK(w, "order received", result)
+}
+
 // AdminList handles GET /admin/orders.
 func (h *Handler) AdminList(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()

@@ -116,7 +116,7 @@ func (h *Handler) setAuthCookie(w http.ResponseWriter, result *LoginResult) {
 }
 
 func decode(r *http.Request, dst any) error {
-	defer r.Body.Close()
+	defer func() { _ = r.Body.Close() }()
 	return json.NewDecoder(r.Body).Decode(dst)
 }
 

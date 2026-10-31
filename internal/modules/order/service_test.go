@@ -33,8 +33,53 @@ func TestTotals(t *testing.T) {
 }
 
 func TestNewServiceClampsShippingPercent(t *testing.T) {
-	svc := NewService(nil, nil, -5)
+	svc := NewService(nil, nil, -5, nil, "")
 	if svc.shippingFeePercent != 0 {
 		t.Fatalf("shippingFeePercent = %v, want 0", svc.shippingFeePercent)
+	}
+}
+
+func TestCustomerCanCancel(t *testing.T) {
+	tests := []struct {
+		name    string
+		status  OrderStatus
+		payment PaymentStatus
+		want    bool
+	}{
+		{"pending unpaid", OrderStatusPending, PaymentStatusUnpaid, true},
+		{"confirmed unpaid", OrderStatusConfirmed, PaymentStatusUnpaid, true},
+		{"processing failed payment", OrderStatusProcessing, PaymentStatusFailed, true},
+		{"shipping unpaid", OrderStatusShipping, PaymentStatusUnpaid, false},
+		{"pending paid", OrderStatusPending, PaymentStatusPaid, false},
+		{"processing refunded", OrderStatusProcessing, PaymentStatusRefunded, false},
+		{"completed unpaid", OrderStatusCompleted, PaymentStatusUnpaid, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := customerCanCancel(tt.status, tt.payment); got != tt.want {
+				t.Fatalf("customerCanCancel(%v, %v) = %v, want %v", tt.status, tt.payment, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCompletionMarksPaid(t *testing.T) {
+	tests := []struct {
+		payment PaymentStatus
+		want    bool
+	}{
+		{PaymentStatusUnpaid, true},
+		{PaymentStatusFailed, true},
+		{PaymentStatusPaid, false},
+		{PaymentStatusRefunded, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.payment.String(), func(t *testing.T) {
+			if got := completionMarksPaid(tt.payment); got != tt.want {
+				t.Fatalf("completionMarksPaid(%v) = %v, want %v", tt.payment, got, tt.want)
+			}
+		})
 	}
 }

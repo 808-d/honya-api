@@ -11,7 +11,7 @@ import (
 
 // Decode reads a JSON request body into dst.
 func Decode(r *http.Request, dst any) error {
-	defer r.Body.Close()
+	defer func() { _ = r.Body.Close() }()
 	return json.NewDecoder(r.Body).Decode(dst)
 }
 

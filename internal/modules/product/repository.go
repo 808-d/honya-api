@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/808-d/honya-api/internal/database/sqlc"
+	"github.com/808-d/honya-api/internal/shared/audit"
 	"github.com/808-d/honya-api/internal/shared/utils"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -75,7 +76,7 @@ func (r *Repository) GetByPublicID(ctx context.Context, publicID string) (*Produ
 }
 
 func (r *Repository) Create(ctx context.Context, in ProductWrite) (*Product, error) {
-	tx, err := r.db.Begin(ctx)
+	tx, err := audit.Begin(ctx, r.db)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +106,7 @@ func (r *Repository) Create(ctx context.Context, in ProductWrite) (*Product, err
 }
 
 func (r *Repository) Update(ctx context.Context, publicID string, in ProductWrite) (*Product, error) {
-	tx, err := r.db.Begin(ctx)
+	tx, err := audit.Begin(ctx, r.db)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +137,20 @@ func (r *Repository) Update(ctx context.Context, publicID string, in ProductWrit
 }
 
 func (r *Repository) SoftDelete(ctx context.Context, publicID string) (int64, error) {
-	return r.q.SoftDeleteProduct(ctx, r.db, publicID)
+	tx, err := audit.Begin(ctx, r.db)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	affected, err := r.q.SoftDeleteProduct(ctx, tx, publicID)
+	if err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return 0, err
+	}
+	return affected, nil
 }
 
 func (r *Repository) loadRelations(ctx context.Context, product *Product) error {

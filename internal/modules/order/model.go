@@ -83,3 +83,10 @@ type CreateOrderItemWrite struct {
 	Quantity     int32
 	Subtotal     float64
 }
+
+// UserContact is the buyer information needed for transactional email.
+type UserContact struct {
+	Username    string
+	DisplayName string
+	Email       string
+}

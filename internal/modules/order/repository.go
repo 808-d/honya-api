@@ -6,6 +6,7 @@ import (
 
 	"github.com/808-d/honya-api/internal/database/sqlc"
 	"github.com/808-d/honya-api/internal/modules/product"
+	"github.com/808-d/honya-api/internal/shared/audit"
 	"github.com/808-d/honya-api/internal/shared/utils"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -23,7 +24,7 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 
 // Begin starts a transaction owned by the service.
 func (r *Repository) Begin(ctx context.Context) (pgx.Tx, error) {
-	return r.db.Begin(ctx)
+	return audit.Begin(ctx, r.db)
 }
 
 // orderRow mirrors the shared column shape of every order read query, so each
@@ -75,6 +76,19 @@ func toOrder(r orderRow) *Order {
 // UserIDByPublicID resolves a user's internal id from their public id.
 func (r *Repository) UserIDByPublicID(ctx context.Context, db sqlc.DBTX, publicID string) (int64, error) {
 	return r.q.GetUserIDByPublicID(ctx, db, publicID)
+}
+
+// UserContactByPublicID returns the buyer's email delivery details.
+func (r *Repository) UserContactByPublicID(ctx context.Context, publicID string) (*UserContact, error) {
+	row, err := r.q.GetUserContactByPublicID(ctx, r.db, publicID)
+	if err != nil {
+		return nil, err
+	}
+	return &UserContact{
+		Username:    row.Username,
+		DisplayName: row.DisplayName,
+		Email:       row.Email,
+	}, nil
 }
 
 // LockCartForCheckout locks the user's cart lines and returns their product
