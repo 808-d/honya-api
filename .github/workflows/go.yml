@@ -53,10 +53,10 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build image
-        run: docker build -f deployments/docker/Dockerfile -t 808-d/honya-api:latest .
+        run: docker build -f deployments/docker/Dockerfile -t duc1709/honya-api:latest .
 
       - name: Push image
-        run: docker push 808-d/honya-api:latest
+        run: docker push duc1709/honya-api:latest
 
       - name: ssh into server
         uses: appleboy/ssh-action@v1
