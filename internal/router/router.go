@@ -33,7 +33,7 @@ func New(db *pgxpool.Pool, rdb *redis.Client, cfg *config.Config) http.Handler {
 	r.Use(chimw.RequestID)
 	r.Use(chimw.ClientIPFromRemoteAddr)
 	r.Use(chimw.Logger)
-	r.Use(appmw.CORS(cfg.WebBaseURL, cfg.AppEnv != "production"))
+	r.Use(appmw.CORS([]string{cfg.WebBaseURL, cfg.DeployURL}, cfg.AppEnv != "production"))
 	r.Use(appmw.ExceptionHandler)
 	r.Use(appmw.RateLimit(100, time.Minute))
 

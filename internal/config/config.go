@@ -21,6 +21,7 @@ type Config struct {
 	// Frontend URLs used to build the verification / reset links in emails
 	AppBaseURL string
 	WebBaseURL string
+	DeployURL  string
 
 	// Verification tokens
 	VerificationTTLMin int
@@ -53,6 +54,7 @@ func Load() (*Config, error) {
 
 		AppBaseURL: getEnv("APP_BASE_URL", "http://localhost:5173"),
 		WebBaseURL: getEnv("WEB_BASE_URL", "http://localhost:5173"),
+		DeployURL:  getEnv("DEPLOY_URL", "http://localhost:5173"),
 
 		VerificationTTLMin: getInt("VERIFICATION_TTL_MINUTES", 30),
 
