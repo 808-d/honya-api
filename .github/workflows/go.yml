@@ -41,24 +41,24 @@ jobs:
     needs: build
 
     steps:
-    - use: actions/checkout@v7
+      - uses: actions/checkout@v7
 
-    name: Docker login
-    uses: docker/login-action@v4
-    with:
-      username: ${{ vars.DOCKERHUB_USERNAME }}
-      password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Docker login
+        uses: docker/login-action@v4
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    name: Build image
-    run: docker build -f deployments/docker/Dockerfile -t 808-d/honya-api:latest .
+      - name: Build image
+        run: docker build -f deployments/docker/Dockerfile -t 808-d/honya-api:latest .
 
-    name: Push image
-    run: docker push 808-d/honya-api:latest
+      - name: Push image
+        run: docker push 808-d/honya-api:latest
 
-    name: ssh into server
-    uses: appleboy/ssh-action@v1
-    with:
-      host: ${{ secrets.HOST }}
-      username: ${{ secrets.USERNAME }}
-      key: ${{ secrets.SECRET_SSH_KEY }}
-      script: /opt/honya/deploy.sh 
+      - name: ssh into server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SECRET_SSH_KEY }}
+          script: /opt/honya/deploy.sh
