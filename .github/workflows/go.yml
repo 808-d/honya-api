@@ -34,7 +34,10 @@ jobs:
       run: test -z "$(gofmt -l .)"
 
     - name: Lint
-      run: golangci-lint run ./...
+      uses: golangci/golangci-lint-action@v8
+      with:
+        version: latest
+        args: ./...
 
   publish:
     runs-on: ubuntu-latest
