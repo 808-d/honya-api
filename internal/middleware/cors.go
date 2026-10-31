@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"net/http"
-	"slices"
 
 	chicors "github.com/go-chi/cors"
 )
@@ -12,10 +11,10 @@ import (
 // When dev is true every Origin is reflected (convenient for localhost on any
 // port); otherwise only allowedOrigin is accepted. Credentials are allowed so
 // the httpOnly access_token cookie is stored and sent.
-func CORS(allowedOrigins []string, dev bool) func(http.Handler) http.Handler {
+func CORS(allowedOrigin string, dev bool) func(http.Handler) http.Handler {
 	return chicors.Handler(chicors.Options{
 		AllowOriginFunc: func(_ *http.Request, origin string) bool {
-			return origin != "" && (dev || slices.Contains(allowedOrigins, origin))
+			return origin != "" && (dev || origin == allowedOrigin)
 		},
 		AllowedMethods: []string{
 			http.MethodGet,
