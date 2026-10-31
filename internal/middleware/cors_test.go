@@ -7,16 +7,16 @@ import (
 )
 
 func TestCORSAllowsConfiguredOrigin(t *testing.T) {
-	const origin = "https://shop.example"
+	origins := []string{"https://shop.example"}
 
 	called := false
-	handler := CORS(origin, false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	handler := CORS(origins, false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusNoContent)
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.Header.Set("Origin", origin)
+	req.Header.Set("Origin", origins)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
