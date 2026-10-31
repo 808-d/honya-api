@@ -50,7 +50,7 @@ jobs:
       password: ${{ secrets.DOCKERHUB_TOKEN }}
 
     name: Build image
-    run: | docker build -f deployments/docker/Dockerfile -t 808-d/honya-api:latest .
+    run: docker build -f deployments/docker/Dockerfile -t 808-d/honya-api:latest .
 
     name: Push image
     run: docker push 808-d/honya-api:latest
